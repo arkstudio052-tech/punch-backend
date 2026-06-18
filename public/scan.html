@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Stamp Scan | PUNCH</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script>
+    (function() {
+      const originalFetch = window.fetch;
+      window.fetch = function(input, init) {
+        if (typeof input === 'string' && input.startsWith('/api/')) {
+          input = (window.API_BASE || '') + input;
+        }
+        return originalFetch(input, init);
+      };
+    })();
+  </script>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 md:p-8 bg-slate-950">
+
+  <!-- Owner Authentication Login Overlay -->
+  <div id="loginOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md transition-all duration-300">
+    <div class="w-full max-w-md p-8 glass border border-indigo-500/10 rounded-3xl space-y-6 text-center shadow-2xl relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      
+      <div class="space-y-3">
+        <!-- Logo container -->
+        <div class="w-20 h-20 mx-auto rounded-2xl border border-slate-800 flex items-center justify-center bg-slate-900 shadow-lg glow-indigo shrink-0 overflow-hidden" id="loginLogoContainer">
+          <span class="text-4xl" id="loginShopEmoji">🔐</span>
+          <img id="loginShopLogo" src="" alt="Shop Logo" class="hidden w-full h-full object-cover">
+        </div>
+        <h2 class="text-2xl font-black text-white" id="loginShopName">Owner Portal Sign In</h2>
+        <p class="text-xs text-slate-400">Please enter your store manager credentials to perform scans.</p>
+      </div>
+      
+      <form id="ownerLoginForm" class="space-y-4 text-left">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="loginUsername">Username</label>
+          <input 
+            type="text" 
+            id="loginUsername" 
+            placeholder="Username" 
+            class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-white placeholder-slate-650 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono"
+            required
+          >
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="loginPassword">Password</label>
+          <input 
+            type="password" 
+            id="loginPassword" 
+            placeholder="Password" 
+            class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-white placeholder-slate-650 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono"
+            required
+          >
+        </div>
+        <button 
+          type="submit" 
+          class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md mt-2"
+        >
+          Verify & Access Scanner
+        </button>
+      </form>
+      <div id="loginError" class="hidden text-xs text-rose-450 font-bold mt-2"></div>
+      <p class="text-[10px] text-slate-500 leading-normal">
+        Defaults to admin / admin if credentials weren't customized on registration.
+      </p>
+    </div>
+  </div>
+
+  <!-- Main Scanner Confirmation Card -->
+  <div class="w-full max-w-md my-auto glass p-8 rounded-3xl border border-indigo-500/10 text-center space-y-6 shadow-xl relative overflow-hidden">
+    
+    <!-- Indigo glow backdrops -->
+    <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+    <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+    <!-- Screen Title -->
+    <div class="flex items-center gap-3.5 border-b border-slate-800/60 pb-4 justify-center">
+      <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center overflow-hidden shrink-0" id="cardLogoContainer">
+        <span class="text-2xl" id="cardLogoFallback">🏪</span>
+        <img id="cardLogoImg" src="" alt="Logo" class="hidden w-full h-full object-cover">
+      </div>
+      <div class="space-y-0.5 text-left">
+        <span class="text-[10px] font-bold tracking-widest text-indigo-400 uppercase block">Loyalty Verification</span>
+        <h2 class="text-xl font-black text-white">Digital Stamp Scan</h2>
+      </div>
+    </div>
+
+    <!-- Loader -->
+    <div id="scanLoader" class="py-12 space-y-2">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+      <p class="text-slate-400 text-xs">Retrieving customer status...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="hidden py-8 space-y-4">
+      <span class="text-4xl">❌</span>
+      <h3 class="text-xl font-bold text-white">Invalid Scan Link</h3>
+      <p class="text-slate-400 text-sm">We couldn't locate this customer or shop record. Ask customer to re-open their loyalty card.</p>
+      <a href="/" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-all">
+        Go Back Home
+      </a>
+    </div>
+
+    <!-- Suspended State -->
+    <div id="suspendedState" class="hidden py-8 space-y-4">
+      <span class="text-4xl">❌</span>
+      <h3 class="text-xl font-bold text-rose-400">Loyalty Portal Offline</h3>
+      <p class="text-slate-450 text-sm">This store's loyalty program is suspended and offline. Points cannot be awarded.</p>
+      <a href="/" class="inline-block bg-slate-900 hover:bg-slate-850 text-slate-300 font-semibold px-5 py-2.5 rounded-xl text-sm transition-all border border-slate-800">
+        Go Back Home
+      </a>
+    </div>
+
+    <!-- Main Verify Form -->
+    <div id="verifyState" class="hidden space-y-6">
+      
+      <!-- Verification Details -->
+      <div class="bg-slate-900/60 border border-slate-900 rounded-2xl p-6 text-left space-y-4">
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span class="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">STORE name</span>
+            <span id="shopName" class="text-white font-bold text-base">...</span>
+          </div>
+          <div>
+            <span class="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">MEMBER</span>
+            <div id="customerName" class="text-white font-bold text-sm">...</div>
+            <div id="customerPhone" class="text-xs text-slate-400 font-mono">...</div>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-900/80 pt-3 flex justify-between items-center">
+          <div>
+            <span class="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">current stamps</span>
+            <span id="currentStamps" class="text-lg text-indigo-400 font-extrabold font-mono">0</span>
+          </div>
+          <div class="text-right">
+            <span class="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">loyalty target</span>
+            <span id="rewardRule" class="text-xs text-amber-400 font-medium">...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <button 
+        id="stampBtn"
+        onclick="confirmStamp()"
+        class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 px-6 rounded-2xl text-base transition-all shadow-lg shadow-indigo-600/30 glow-indigo"
+      >
+        Award Loyalty Stamp (+1)
+      </button>
+
+      <p class="text-[10px] text-slate-500 font-mono" id="customerIdDisplay">ID: ...</p>
+    </div>
+
+    <!-- Success State -->
+    <div id="successState" class="hidden py-8 space-y-6">
+      <!-- Success Checkmark Animation -->
+      <div class="success-checkmark">
+        <div class="check-icon">
+          <div class="icon-line line-tip"></div>
+          <div class="icon-line line-long"></div>
+          <div class="icon-circle"></div>
+          <div class="icon-fix"></div>
+        </div>
+      </div>
+
+      <div class="space-y-1">
+        <h3 class="text-2xl font-extrabold text-emerald-400">Stamp Added!</h3>
+        <p class="text-slate-300 text-sm">Customer's loyalty card updated successfully.</p>
+      </div>
+
+      <div class="bg-emerald-950/20 border border-emerald-900/30 rounded-2xl p-5 space-y-2">
+        <span class="block text-[10px] font-bold tracking-wider text-slate-400 uppercase">new balance</span>
+        <div class="text-3xl font-black text-white font-mono" id="newStampsText">
+          0 <span class="text-slate-500 text-sm font-normal">Stamps</span>
+        </div>
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <button 
+          onclick="window.close()" 
+          class="flex-1 bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-850 font-bold py-3 px-5 rounded-xl text-sm transition-all"
+        >
+          Close Page
+        </button>
+        <a 
+          id="goToDashboardBtn"
+          href="#"
+          class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-5 rounded-xl text-sm transition-all shadow-md"
+        >
+          Manager Console
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Extract customer ID from URL path
+    const pathParts = window.location.pathname.split('/');
+    const customerId = pathParts[2] ? pathParts[2] : '';
+    const lastHyphen = customerId.lastIndexOf('-');
+    const shopSlug = lastHyphen !== -1 ? customerId.substring(0, lastHyphen) : '';
+
+    // Auth Elements
+    const loginOverlay = document.getElementById('loginOverlay');
+    const ownerLoginForm = document.getElementById('ownerLoginForm');
+    const loginUsernameInput = document.getElementById('loginUsername');
+    const loginPasswordInput = document.getElementById('loginPassword');
+    const loginError = document.getElementById('loginError');
+
+    // Elements
+    const scanLoader = document.getElementById('scanLoader');
+    const errorState = document.getElementById('errorState');
+    const verifyState = document.getElementById('verifyState');
+    const successState = document.getElementById('successState');
+
+    const shopName = document.getElementById('shopName');
+    const customerPhone = document.getElementById('customerPhone');
+    const currentStamps = document.getElementById('currentStamps');
+    const rewardRule = document.getElementById('rewardRule');
+    const customerIdDisplay = document.getElementById('customerIdDisplay');
+    const stampBtn = document.getElementById('stampBtn');
+    
+    const newStampsText = document.getElementById('newStampsText');
+    const goToDashboardBtn = document.getElementById('goToDashboardBtn');
+
+    let customer = null;
+    let shop = null;
+
+    // fetch helper with auth headers
+    function fetchWithAuth(url, options = {}) {
+      if (!options.headers) {
+        options.headers = {};
+      }
+      
+      const username = sessionStorage.getItem('owner_username');
+      const password = sessionStorage.getItem('owner_password');
+      
+      options.headers['x-owner-username'] = username;
+      options.headers['x-owner-password'] = password;
+      
+      return fetch(url, options).then(response => {
+        if (response.status === 401) {
+          sessionStorage.removeItem('owner_username');
+          sessionStorage.removeItem('owner_password');
+          loginOverlay.classList.remove('hidden');
+          scanLoader.classList.add('hidden');
+          verifyState.classList.add('hidden');
+          throw new Error('Session expired or unauthorized. Please log in.');
+        }
+        return response;
+      });
+    }
+
+    async function init() {
+      if (!customerId) {
+        showState(errorState);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/customers/${customerId}`);
+        if (!response.ok) throw new Error('Customer not found');
+        
+        const data = await response.json();
+        customer = data.customer;
+        shop = data.shop;
+
+        if (shop.isSuspended) {
+          showState(document.getElementById('suspendedState'));
+          return;
+        }
+
+        // Brand Login Overlay and Card Header with Shop Logo & Name
+        if (shop.name) {
+          document.getElementById('loginShopName').textContent = `${shop.name} Owner Sign In`;
+        }
+        if (shop.logo) {
+          const loginShopLogo = document.getElementById('loginShopLogo');
+          const loginShopEmoji = document.getElementById('loginShopEmoji');
+          if (loginShopLogo) {
+            loginShopLogo.src = shop.logo;
+            loginShopLogo.classList.remove('hidden');
+          }
+          if (loginShopEmoji) {
+            loginShopEmoji.classList.add('hidden');
+          }
+
+          const cardLogoImg = document.getElementById('cardLogoImg');
+          const cardLogoFallback = document.getElementById('cardLogoFallback');
+          if (cardLogoImg) {
+            cardLogoImg.src = shop.logo;
+            cardLogoImg.classList.remove('hidden');
+          }
+          if (cardLogoFallback) {
+            cardLogoFallback.classList.add('hidden');
+          }
+        } else {
+          const loginShopLogo = document.getElementById('loginShopLogo');
+          const loginShopEmoji = document.getElementById('loginShopEmoji');
+          if (loginShopLogo) loginShopLogo.classList.add('hidden');
+          if (loginShopEmoji) loginShopEmoji.classList.remove('hidden');
+
+          const cardLogoImg = document.getElementById('cardLogoImg');
+          const cardLogoFallback = document.getElementById('cardLogoFallback');
+          if (cardLogoImg) cardLogoImg.classList.add('hidden');
+          if (cardLogoFallback) cardLogoFallback.classList.remove('hidden');
+        }
+
+        // Auth gate check
+        if (!sessionStorage.getItem('owner_username') || !sessionStorage.getItem('owner_password')) {
+          loginOverlay.classList.remove('hidden');
+          scanLoader.classList.add('hidden');
+          return;
+        }
+
+        // Render verification screen details
+        shopName.textContent = shop.name;
+        document.getElementById('customerName').textContent = customer.name || 'Anonymous';
+        customerPhone.textContent = maskPhoneNumber(customer.phone);
+        currentStamps.textContent = customer.points;
+        rewardRule.textContent = shop.rule;
+        customerIdDisplay.textContent = `Customer ID: ${customer.id}`;
+        
+        goToDashboardBtn.href = `/${shop.id}/owner`;
+
+        showState(verifyState);
+      } catch (err) {
+        console.error(err);
+        showState(errorState);
+      }
+    }
+
+    function showState(element) {
+      scanLoader.classList.add('hidden');
+      errorState.classList.add('hidden');
+      verifyState.classList.add('hidden');
+      successState.classList.add('hidden');
+      document.getElementById('suspendedState').classList.add('hidden');
+
+      element.classList.remove('hidden');
+    }
+
+    function maskPhoneNumber(phone) {
+      if (phone.length <= 6) return phone;
+      // Mask middle part, show first 3 and last 3 digits
+      return phone.substring(0, 3) + '*****' + phone.substring(phone.length - 3);
+    }
+
+    async function confirmStamp() {
+      stampBtn.disabled = true;
+      stampBtn.textContent = 'Awarding Stamp...';
+
+      try {
+        const response = await fetchWithAuth(`/api/customers/${customerId}/add-point`, {
+          method: 'POST'
+        });
+
+        if (!response.ok) throw new Error('Failed to update points balance');
+        const updatedCustomer = await response.json();
+
+        // Trigger mobile haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate([100, 50, 100]);
+        }
+
+        // Populate and display success screen
+        newStampsText.innerHTML = `${updatedCustomer.points} <span class="text-slate-500 text-sm font-normal">Stamps</span>`;
+        showState(successState);
+      } catch (err) {
+        alert(err.message);
+        stampBtn.disabled = false;
+        stampBtn.textContent = 'Award Loyalty Stamp (+1)';
+      }
+    }
+
+    // Owner Login Form submission handler
+    ownerLoginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = loginUsernameInput.value.trim();
+      const password = loginPasswordInput.value.trim();
+      
+      try {
+        const response = await fetch(`/api/shops/${shopSlug}/owner/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Login failed.');
+        
+        sessionStorage.setItem('owner_username', username);
+        sessionStorage.setItem('owner_password', password);
+        
+        loginOverlay.classList.add('hidden');
+        loginError.classList.add('hidden');
+        
+        // Re-run status check
+        scanLoader.classList.remove('hidden');
+        await init();
+      } catch (err) {
+        loginError.textContent = err.message;
+        loginError.classList.remove('hidden');
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

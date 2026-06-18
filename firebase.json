@@ -1,0 +1,35 @@
+{
+  "database": {
+    "rules": "database.rules.json"
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/scan/**",
+        "destination": "/scan.html"
+      },
+      {
+        "source": "/redeem/**",
+        "destination": "/redeem.html"
+      },
+      {
+        "source": "/superadmin",
+        "destination": "/superadmin.html"
+      },
+      {
+        "source": "/*/owner",
+        "destination": "/owner.html"
+      },
+      {
+        "source": "/*",
+        "destination": "/customer.html"
+      }
+    ]
+  }
+}

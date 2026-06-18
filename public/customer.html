@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Portal | PUNCH</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script>
+    (function() {
+      const originalFetch = window.fetch;
+      window.fetch = function(input, init) {
+        if (typeof input === 'string' && input.startsWith('/api/')) {
+          input = (window.API_BASE || '') + input;
+        }
+        return originalFetch(input, init);
+      };
+    })();
+  </script>
+</head>
+<body class="flex flex-col items-center justify-start min-h-screen p-4 md:p-8 bg-slate-950">
+
+  <!-- Main Container -->
+  <div class="w-full max-w-md my-auto">
+    
+    <!-- Header with Back to home & Brand -->
+    <div class="flex justify-between items-center mb-6 px-1">
+      <a href="/" class="text-sm font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+        ← Home
+      </a>
+      <span id="headerShopSlug" class="text-xs font-mono text-slate-500 uppercase tracking-widest"></span>
+    </div>
+
+    <!-- Shop Identity Loader -->
+    <div id="shopLoader" class="text-center py-12">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mb-2"></div>
+      <p class="text-slate-400 text-sm">Loading digital portal...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="hidden glass p-6 rounded-2xl border-rose-500/20 text-center space-y-4">
+      <span class="text-4xl">⚠️</span>
+      <h3 class="text-xl font-bold text-white">Portal Not Found</h3>
+      <p class="text-slate-400 text-sm">We couldn't load this store's loyalty portal. Please verify the URL slug.</p>
+      <a href="/" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-all">
+        Go Back Home
+      </a>
+    </div>
+
+    <!-- Suspended State -->
+    <div id="suspendedScreen" class="hidden glass p-8 rounded-2xl border border-rose-500/20 text-center space-y-4 shadow-2xl relative overflow-hidden">
+      <!-- Glow -->
+      <div class="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute bottom-0 left-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      
+      <span class="text-5xl">🚫</span>
+      <h3 class="text-2xl font-bold text-white">Store Offline</h3>
+      <p class="text-slate-400 text-sm leading-relaxed">
+        This loyalty program is temporarily offline. Please contact the store staff for assistance.
+      </p>
+      <a href="/" class="inline-block bg-slate-900 hover:bg-slate-850 text-slate-300 font-semibold px-6 py-2.5 rounded-xl text-xs border border-slate-800 transition-all mt-2">
+        ← Go back Home
+      </a>
+    </div>
+
+    <!-- Login / Registration Screen -->
+    <div id="loginScreen" class="hidden glass p-8 rounded-2xl glow-indigo space-y-6">
+      <div class="text-center space-y-3">
+        <div class="w-20 h-20 mx-auto rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center bg-slate-900 shadow-lg glow-indigo shrink-0" id="loginLogoContainer">
+          <span class="text-4xl" id="loginShopEmoji">🏪</span>
+          <img id="loginShopLogo" src="" alt="Shop Logo" class="hidden w-full h-full object-cover">
+        </div>
+        <h2 class="text-3xl font-extrabold text-white" id="loginShopName">Shop Portal</h2>
+        <p class="text-slate-400 text-sm" id="loginShopRule">Join our loyalty card to earn rewards!</p>
+      </div>
+
+      <!-- Step 1: Phone Form -->
+      <form id="phoneForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-slate-300 mb-1.5" for="phoneInput">Cell Phone Number</label>
+          <input 
+            type="tel" 
+            id="phoneInput" 
+            placeholder="e.g. 09171234567" 
+            class="w-full bg-slate-900/60 border border-slate-700/80 rounded-xl px-4 py-3 text-white text-center text-lg tracking-wider placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono"
+            required
+          >
+        </div>
+        <button 
+          type="submit" 
+          class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-lg shadow-indigo-600/30 text-base"
+        >
+          Continue
+        </button>
+      </form>
+
+      <!-- Step 2: Name Form (New Users Only) -->
+      <form id="nameForm" class="hidden space-y-4">
+        <div class="text-center pb-2">
+          <p class="text-xs font-semibold text-indigo-400">✨ First Time Visitor!</p>
+          <p class="text-[11px] text-slate-400">Please enter your name to complete registration.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-300 mb-1.5" for="nameInput">Your Full Name</label>
+          <input 
+            type="text" 
+            id="nameInput" 
+            placeholder="e.g. Juan Dela Cruz" 
+            class="w-full bg-slate-900/60 border border-slate-700/80 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-base"
+            required
+          >
+        </div>
+        <button 
+          type="submit" 
+          class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-lg shadow-indigo-600/30 text-base"
+        >
+          Complete Registration
+        </button>
+        <div class="text-center">
+          <button 
+            type="button" 
+            onclick="backToPhone()" 
+            class="text-xs text-slate-500 hover:text-slate-400 hover:underline"
+          >
+            ← Use different phone number
+          </button>
+        </div>
+      </form>
+      <p class="text-xs text-slate-500 text-center">
+        No password needed. We use your phone number exclusively to identify your unique stamp card.
+      </p>
+    </div>
+
+    <!-- Stamp Card Screen (Signed In) -->
+    <div id="cardScreen" class="hidden space-y-6">
+      
+      <!-- Loyalty Stamp Card -->
+      <div class="glass p-6 rounded-3xl glow-indigo border border-indigo-500/20 relative overflow-hidden flex flex-col items-center">
+        <!-- Floating brand mark -->
+        <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div class="w-full flex justify-between items-center mb-6">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center overflow-hidden shrink-0" id="cardLogoContainer">
+              <span class="text-xl" id="cardLogoFallback">🏪</span>
+              <img id="cardLogoImg" src="" alt="Shop Logo" class="hidden w-full h-full object-cover">
+            </div>
+            <div class="space-y-0.5">
+              <h3 class="text-xl font-bold text-white tracking-tight" id="cardShopName">Shop Name</h3>
+              <p class="text-xs text-indigo-300 font-medium" id="cardShopRule">Loyalty Reward Rule</p>
+              <p class="text-xs text-slate-400 font-semibold pt-0.5">Member: <span id="cardCustomerName" class="text-indigo-400">...</span></p>
+            </div>
+          </div>
+          <button 
+            onclick="signOut()" 
+            class="text-xs text-slate-400 hover:text-slate-300 bg-slate-900/40 hover:bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800 transition-all self-start"
+          >
+            Sign Out
+          </button>
+        </div>
+
+        <!-- Stamp Grid -->
+        <div id="stampGrid" class="grid grid-cols-5 gap-3 w-full mb-6 justify-items-center">
+          <!-- Dynamically populated stamps -->
+        </div>
+
+        <!-- Progress Counter -->
+        <div class="text-center mb-6">
+          <span class="text-xs uppercase tracking-widest text-slate-400 font-bold block mb-1">STAMP PROGRESS</span>
+          <div class="text-3xl font-extrabold text-white">
+            <span id="currentPointsText" class="text-indigo-400">0</span>
+            <span class="text-slate-500">/</span>
+            <span id="maxPointsText">10</span>
+          </div>
+        </div>
+
+        <!-- Loyalty Action Areas (Toggled Dynamically) -->
+        <div class="w-full bg-slate-950/60 border border-slate-900 rounded-2xl p-6 flex flex-col items-center justify-center min-h-[260px]">
+          
+          <!-- State A: Add Stamp QR -->
+          <div id="addStampSection" class="hidden flex flex-col items-center gap-4 w-full">
+            <div class="bg-white p-3 rounded-xl shadow-lg border border-slate-200 glow-indigo">
+              <img id="qrCodeImg" src="" alt="Loyalty QR Code" class="w-40 h-40 object-contain">
+            </div>
+            <div class="text-center space-y-1">
+              <p class="text-sm font-bold text-white">Show QR code to cashier</p>
+              <p class="text-xs text-slate-400">Cashier scans to add a stamp to your balance</p>
+              <p class="text-[10px] font-mono text-slate-600 mt-2 select-all" id="customerIdDisplay">ID: ...</p>
+            </div>
+          </div>
+
+          <!-- State B: Claim Button (When points full) -->
+          <div id="claimRewardBtnSection" class="hidden flex flex-col items-center gap-4 text-center w-full py-4">
+            <span class="text-5xl animate-bounce">🎁</span>
+            <div class="space-y-1">
+              <p class="text-lg font-extrabold text-amber-400">Reward Earned!</p>
+              <p class="text-xs text-slate-300 leading-relaxed max-w-[250px] mx-auto">
+                You have collected enough stamps. Click below to generate your reward claim code.
+              </p>
+            </div>
+            <button 
+              onclick="initiateClaim()" 
+              class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black py-3 px-6 rounded-xl text-sm transition-all shadow-lg shadow-amber-500/20 glow-indigo uppercase tracking-wider"
+            >
+              Claim My Reward
+            </button>
+          </div>
+
+          <!-- State C: Pending Redemption (Code & QR shown) -->
+          <div id="pendingClaimSection" class="hidden flex flex-col items-center gap-4 text-center w-full">
+            <div class="text-4xl font-extrabold text-amber-400 font-mono tracking-widest bg-slate-900 border border-slate-800 rounded-xl px-6 py-3.5 glow-indigo select-all" id="pendingCodeDisplay">
+              0000
+            </div>
+            <div class="bg-white p-3 rounded-xl shadow-lg border border-slate-200 glow-indigo">
+              <img id="redeemQrCodeImg" src="" alt="Redeem QR Code" class="w-32 h-32 object-contain">
+            </div>
+            <div class="space-y-1.5">
+              <p class="text-sm font-bold text-white">Show code to cashier</p>
+              <p class="text-xs text-slate-400">Cashier scans QR or enters the 4-digit code to redeem</p>
+              <button 
+                onclick="cancelClaim()" 
+                class="text-xs text-rose-400 hover:text-rose-300 hover:underline pt-2"
+              >
+                Cancel Redemption Code
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Marketing Specials & Menu Card -->
+      <div class="glass p-6 rounded-2xl space-y-4">
+        <h4 class="text-md font-bold text-white flex items-center gap-1.5">
+          <span>📢</span> Daily Specials & Promos
+        </h4>
+        <div id="specialsList" class="space-y-2.5">
+          <!-- Dynamically filled list -->
+        </div>
+      </div>
+
+      <!-- Rewards Catalog Card (Customer View) -->
+      <div class="glass p-6 rounded-2xl space-y-4">
+        <h4 class="text-md font-bold text-white flex items-center gap-1.5">
+          <span>🎁</span> Loyalty Rewards & Tiers
+        </h4>
+        <p class="text-slate-450 text-xs leading-relaxed">
+          Here are the loyalty stamp tiers offered by this shop. Keep an eye out for seasonal changes!
+        </p>
+        <div id="customerRewardsList" class="space-y-2">
+          <!-- Dynamically filled list of rewards -->
+        </div>
+      </div>
+
+      <!-- Reward History Card -->
+      <div class="glass p-6 rounded-2xl space-y-4">
+        <h4 class="text-md font-bold text-white flex items-center gap-1.5">
+          <span>🏆</span> Claimed Rewards History
+        </h4>
+        <div id="redemptionsList" class="space-y-2">
+          <!-- Dynamically filled list -->
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Extract shop slug from path
+    const pathParts = window.location.pathname.split('/');
+    const shopSlug = pathParts[1] ? pathParts[1].toLowerCase() : '';
+
+    // Elements
+    const shopLoader = document.getElementById('shopLoader');
+    const errorState = document.getElementById('errorState');
+    const loginScreen = document.getElementById('loginScreen');
+    const cardScreen = document.getElementById('cardScreen');
+    const suspendedScreen = document.getElementById('suspendedScreen');
+    
+    const loginShopName = document.getElementById('loginShopName');
+    const loginShopRule = document.getElementById('loginShopRule');
+    const headerShopSlug = document.getElementById('headerShopSlug');
+    
+    const cardShopName = document.getElementById('cardShopName');
+    const cardShopRule = document.getElementById('cardShopRule');
+    const currentPointsText = document.getElementById('currentPointsText');
+    const maxPointsText = document.getElementById('maxPointsText');
+    const stampGrid = document.getElementById('stampGrid');
+    const qrCodeImg = document.getElementById('qrCodeImg');
+    const customerIdDisplay = document.getElementById('customerIdDisplay');
+    const specialsList = document.getElementById('specialsList');
+
+    const phoneForm = document.getElementById('phoneForm');
+    const nameForm = document.getElementById('nameForm');
+    const nameInput = document.getElementById('nameInput');
+    const phoneInput = document.getElementById('phoneInput');
+
+    let shopData = null;
+    let customerData = null;
+
+    // Initialize Page
+    async function init() {
+      if (!shopSlug) {
+        showScreen(errorState);
+        return;
+      }
+      headerShopSlug.textContent = shopSlug;
+
+      try {
+        // Fetch Shop details
+        const response = await fetch(`/api/shops/${shopSlug}`);
+        if (!response.ok) throw new Error('Shop not found');
+        shopData = await response.json();
+        
+        // Check suspension status
+        if (shopData.isSuspended) {
+          showScreen(suspendedScreen);
+          return;
+        }
+        
+        // Brand Login Page
+        loginShopName.textContent = shopData.name;
+        loginShopRule.textContent = shopData.rule;
+        
+        if (shopData.logo) {
+          const loginShopLogo = document.getElementById('loginShopLogo');
+          const loginShopEmoji = document.getElementById('loginShopEmoji');
+          loginShopLogo.src = shopData.logo;
+          loginShopLogo.classList.remove('hidden');
+          loginShopEmoji.classList.add('hidden');
+        }
+        
+        // Check active session
+        const storedCustomerId = localStorage.getItem(`punch_customer_${shopSlug}`);
+        if (storedCustomerId) {
+          await loadCustomer(storedCustomerId);
+        } else {
+          showScreen(loginScreen);
+        }
+      } catch (err) {
+        console.error(err);
+        showScreen(errorState);
+      }
+    }
+
+    function showScreen(screen) {
+      shopLoader.classList.add('hidden');
+      errorState.classList.add('hidden');
+      loginScreen.classList.add('hidden');
+      cardScreen.classList.add('hidden');
+      suspendedScreen.classList.add('hidden');
+      
+      screen.classList.remove('hidden');
+    }
+
+    // Form 1: Phone check submission
+    phoneForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const phone = phoneInput.value.trim();
+      if (!phone) return;
+
+      try {
+        const response = await fetch(`/api/shops/${shopSlug}/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to check phone number.');
+        }
+
+        const data = await response.json();
+        
+        if (data.isNew) {
+          // New user: display name form
+          phoneForm.classList.add('hidden');
+          nameForm.classList.remove('hidden');
+          nameInput.value = '';
+          nameInput.focus();
+        } else {
+          // Existing user: direct login
+          localStorage.setItem(`punch_customer_${shopSlug}`, data.customer.id);
+          await loadCustomer(data.customer.id);
+        }
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    // Form 2: Complete registration with name
+    nameForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const phone = phoneInput.value.trim();
+      const name = nameInput.value.trim();
+      if (!phone || !name) return;
+
+      try {
+        const response = await fetch(`/api/shops/${shopSlug}/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, name })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to complete registration.');
+        }
+
+        const data = await response.json();
+        localStorage.setItem(`punch_customer_${shopSlug}`, data.customer.id);
+        await loadCustomer(data.customer.id);
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    function backToPhone() {
+      nameForm.classList.add('hidden');
+      phoneForm.classList.remove('hidden');
+      phoneInput.value = '';
+      nameInput.value = '';
+      phoneInput.focus();
+    }
+
+    // Load customer data and populate card
+    async function loadCustomer(customerId) {
+      try {
+        const response = await fetch(`/api/customers/${customerId}`);
+        if (!response.ok) {
+          // If customer not found in DB, clear localStorage and redirect to login
+          localStorage.removeItem(`punch_customer_${shopSlug}`);
+          showScreen(loginScreen);
+          return;
+        }
+
+        const data = await response.json();
+        customerData = data.customer;
+        shopData = data.shop;
+
+        renderLoyaltyCard();
+        showScreen(cardScreen);
+      } catch (err) {
+        console.error(err);
+        alert('Error loading card data.');
+      }
+    }
+
+    // Render stamp layout
+    function renderLoyaltyCard() {
+      cardShopName.textContent = shopData.name;
+      cardShopRule.textContent = shopData.rule;
+      document.getElementById('cardCustomerName').textContent = customerData.name || 'Anonymous';
+
+      if (shopData.logo) {
+        const cardLogoImg = document.getElementById('cardLogoImg');
+        const cardLogoFallback = document.getElementById('cardLogoFallback');
+        cardLogoImg.src = shopData.logo;
+        cardLogoImg.classList.remove('hidden');
+        cardLogoFallback.classList.add('hidden');
+      }
+      
+      const currentPoints = customerData.points;
+      currentPointsText.textContent = currentPoints;
+      
+      // Dynamic max stamp count from rule (e.g. "10 points" -> 10, default 10)
+      const maxPoints = parseInt(shopData.rule.match(/\d+/)?.[0]) || 10;
+      maxPointsText.textContent = maxPoints;
+
+      // Draw stamps grid
+      stampGrid.innerHTML = '';
+      for (let i = 1; i <= maxPoints; i++) {
+        const stampElement = document.createElement('div');
+        stampElement.className = 'w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all ';
+        
+        if (i <= currentPoints) {
+          // Completed stamp slot
+          stampElement.className += 'bg-indigo-500/20 border-indigo-500 text-indigo-400 animate-stamp glow-indigo';
+          stampElement.innerHTML = `
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+            </svg>
+          `;
+        } else {
+          // Empty stamp slot
+          stampElement.className += 'border-slate-800 bg-slate-900/40 text-slate-700 border-dashed';
+          stampElement.innerHTML = `<span class="text-sm font-semibold">${i}</span>`;
+        }
+        stampGrid.appendChild(stampElement);
+      }
+
+      const addStampSection = document.getElementById('addStampSection');
+      const claimRewardBtnSection = document.getElementById('claimRewardBtnSection');
+      const pendingClaimSection = document.getElementById('pendingClaimSection');
+
+      addStampSection.classList.add('hidden');
+      claimRewardBtnSection.classList.add('hidden');
+      pendingClaimSection.classList.add('hidden');
+
+      // Manage active loyalty screen states
+      if (customerData.pendingRedeem) {
+        // Display Active Redeem Code screen
+        const redeemUrl = `${window.location.origin}/redeem/${customerData.id}/${customerData.pendingRedeem.code}`;
+        document.getElementById('pendingCodeDisplay').textContent = customerData.pendingRedeem.code;
+        document.getElementById('redeemQrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(redeemUrl)}`;
+        pendingClaimSection.classList.remove('hidden');
+      } else if (currentPoints >= maxPoints) {
+        // Display claim reward button
+        claimRewardBtnSection.classList.remove('hidden');
+      } else {
+        // Display normal point-accumulate QR Code
+        const scanUrl = `${window.location.origin}/scan/${customerData.id}`;
+        qrCodeImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(scanUrl)}`;
+        customerIdDisplay.textContent = `ID: ${customerData.id}`;
+        addStampSection.classList.remove('hidden');
+      }
+
+      // Render Redemptions History
+      const redemptionsList = document.getElementById('redemptionsList');
+      redemptionsList.innerHTML = '';
+      if (customerData.redemptions && customerData.redemptions.length > 0) {
+        customerData.redemptions.forEach(r => {
+          const date = new Date(r.redeemedAt).toLocaleDateString(undefined, {
+            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+          const item = document.createElement('div');
+          item.className = 'p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-xs text-slate-300 flex justify-between items-center';
+          item.innerHTML = `
+            <div>
+              <span class="text-emerald-400 font-bold block text-[11px]">Reward Claimed</span>
+              <span class="text-[9px] text-slate-500 font-mono">${date}</span>
+            </div>
+            <span class="font-mono text-amber-400 font-bold bg-slate-950 px-2 py-1 rounded border border-slate-900 text-[11px]">Code: ${r.code}</span>
+          `;
+          redemptionsList.appendChild(item);
+        });
+      } else {
+        redemptionsList.innerHTML = '<p class="text-xs text-slate-500 text-center py-2">No rewards claimed yet.</p>';
+      }
+
+      // Populate Specials
+      specialsList.innerHTML = '';
+      if (shopData.specials && shopData.specials.length > 0) {
+        shopData.specials.forEach(spec => {
+          const item = document.createElement('div');
+          item.className = 'p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-sm text-slate-300 flex items-start gap-2.5';
+          item.innerHTML = `
+            <span class="text-indigo-400 mt-0.5">•</span>
+            <span>${spec}</span>
+          `;
+          specialsList.appendChild(item);
+        });
+      } else {
+        specialsList.innerHTML = '<p class="text-xs text-slate-500 text-center py-2">No specials listed today.</p>';
+      }
+
+      // Populate customer rewards catalog
+      const customerRewardsList = document.getElementById('customerRewardsList');
+      if (customerRewardsList) {
+        customerRewardsList.innerHTML = '';
+        if (shopData.rewards && shopData.rewards.length > 0) {
+          shopData.rewards.forEach(r => {
+            const item = document.createElement('div');
+            item.className = `p-3 rounded-xl border text-xs flex justify-between items-center transition-all ${
+              r.isActive 
+                ? 'bg-indigo-600/10 border-indigo-500/30 shadow-md glow-indigo' 
+                : 'bg-slate-900/40 border-slate-800/80 opacity-60'
+            }`;
+            
+            item.innerHTML = `
+              <div class="space-y-0.5">
+                <span class="text-white font-bold block">${r.pointsRequired} Stamps</span>
+                <span class="text-slate-400 font-medium">${escapeHtml(r.rewardText)}</span>
+              </div>
+              ${r.isActive 
+                ? `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold">Active Reward</span>`
+                : `<span class="bg-slate-850 text-slate-500 border border-slate-800 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono">Seasonal</span>`
+              }
+            `;
+            customerRewardsList.appendChild(item);
+          });
+        } else {
+          customerRewardsList.innerHTML = '<p class="text-xs text-slate-500 text-center py-2">No rewards configured.</p>';
+        }
+      }
+    }
+
+    function signOut() {
+      localStorage.removeItem(`punch_customer_${shopSlug}`);
+      phoneInput.value = '';
+      nameInput.value = '';
+      nameForm.classList.add('hidden');
+      phoneForm.classList.remove('hidden');
+      showScreen(loginScreen);
+    }
+
+    async function initiateClaim() {
+      const maxPoints = parseInt(maxPointsText.textContent) || 10;
+      try {
+        const response = await fetch(`/api/customers/${customerData.id}/redeem/init`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maxPoints })
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Failed to generate claim code.');
+        }
+        const updatedCustomer = await response.json();
+        customerData = updatedCustomer;
+        renderLoyaltyCard();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function cancelClaim() {
+      try {
+        const response = await fetch(`/api/customers/${customerData.id}/redeem/cancel`, {
+          method: 'POST'
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Failed to cancel claim code.');
+        }
+        const updatedCustomer = await response.json();
+        customerData = updatedCustomer;
+        renderLoyaltyCard();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Auto poll customer status every 5 seconds to automatically update points when scanned!
+    setInterval(() => {
+      const storedCustomerId = localStorage.getItem(`punch_customer_${shopSlug}`);
+      if (storedCustomerId && cardScreen.classList.contains('hidden') === false) {
+        loadCustomer(storedCustomerId);
+      }
+    }, 4000);
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    init();
+  </script>
+</body>
+</html>

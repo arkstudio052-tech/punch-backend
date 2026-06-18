@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Admin Console | PUNCH</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script>
+    (function() {
+      const originalFetch = window.fetch;
+      window.fetch = function(input, init) {
+        if (typeof input === 'string' && input.startsWith('/api/')) {
+          input = (window.API_BASE || '') + input;
+        }
+        return originalFetch(input, init);
+      };
+    })();
+  </script>
+</head>
+<body class="flex flex-col items-center justify-start min-h-screen p-4 md:p-8 bg-slate-950">
+
+  <!-- Super Admin Access Code Overlay -->
+  <div id="loginOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md transition-all duration-300">
+    <div class="w-full max-w-md p-8 glass border border-indigo-500/10 rounded-3xl space-y-6 text-center shadow-2xl relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      
+      <div class="space-y-2">
+        <span class="text-4xl">🔑</span>
+        <h2 class="text-2xl font-black text-white">Super Admin Console</h2>
+        <p class="text-xs text-slate-400">Please enter the platform operator master code to authenticate.</p>
+      </div>
+      
+      <form id="adminLoginForm" class="space-y-4 text-left">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-450 mb-1.5" for="loginCode">Access Code</label>
+          <input 
+            type="password" 
+            id="loginCode" 
+            placeholder="Enter Code (e.g. *12341234)" 
+            class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono text-center tracking-widest text-lg"
+            required
+          >
+        </div>
+        <button 
+          type="submit" 
+          class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md mt-2"
+        >
+          Verify Master Access
+        </button>
+      </form>
+      <div id="loginError" class="hidden text-xs text-rose-500 font-bold mt-2"></div>
+    </div>
+  </div>
+
+  <!-- Edit Shop Details Modal -->
+  <div id="editShopModal" class="fixed inset-0 z-40 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-md transition-all duration-300 p-4">
+    <div class="w-full max-w-md p-8 glass border border-indigo-500/10 rounded-3xl space-y-6 shadow-2xl relative overflow-hidden text-left">
+      <button 
+        type="button" 
+        onclick="closeEditModal()" 
+        class="absolute top-4 right-4 text-slate-400 hover:text-white transition-all text-xl p-2 rounded-full hover:bg-white/5"
+      >
+        ✕
+      </button>
+
+      <div class="space-y-1">
+        <h3 class="text-xl font-black text-white">Edit Store Details</h3>
+        <p class="text-xs text-slate-450">Modify details for <span id="editingShopSlugTitle" class="text-indigo-400 font-mono"></span></p>
+      </div>
+
+      <form id="editShopForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="editShopName">Shop Name</label>
+          <input 
+            type="text" 
+            id="editShopName" 
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            required
+          >
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="editShopRule">Active Loyalty Rule</label>
+          <input 
+            type="text" 
+            id="editShopRule" 
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            required
+          >
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="editOwnerUser">Owner Username</label>
+            <input 
+              type="text" 
+              id="editOwnerUser" 
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              required
+            >
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="editOwnerPass">Owner Password</label>
+            <input 
+              type="text" 
+              id="editOwnerPass" 
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              required
+            >
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button 
+            type="button" 
+            onclick="closeEditModal()" 
+            class="flex-1 bg-slate-900 hover:bg-slate-850 text-slate-300 font-semibold py-2.5 rounded-xl text-xs border border-slate-800 transition-all"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs transition-colors shadow-md"
+          >
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Super Admin Layout -->
+  <div class="w-full max-w-6xl space-y-8">
+    
+    <!-- Top Header -->
+    <header class="flex justify-between items-center border-b border-slate-850 pb-6 w-full gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="text-3xl shrink-0">🛡️</span>
+        <div class="space-y-0.5 text-left truncate">
+          <h1 class="text-xl md:text-2xl font-extrabold text-white truncate">Super Admin Console</h1>
+          <p class="text-slate-400 text-xs truncate">Platform oversight and tenant catalog metrics</p>
+        </div>
+      </div>
+      
+      <!-- Header Controls -->
+      <div class="flex items-center gap-2 md:gap-3 relative shrink-0">
+        <!-- Notification Button -->
+        <button id="notificationBtn" class="relative bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white p-2.5 rounded-xl border border-slate-800 transition-all focus:outline-none" title="Notifications">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+          </svg>
+          <span id="notificationBadge" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full hidden border border-slate-950">
+            0
+          </span>
+        </button>
+
+        <button 
+          onclick="logout()" 
+          class="bg-slate-900 hover:bg-slate-850 text-slate-350 px-4 py-2.5 rounded-xl text-xs border border-slate-800 transition-all hidden md:block"
+        >
+          Logout Admin
+        </button>
+        <a href="/" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-md transition-all hidden md:flex items-center justify-center">
+          Go back Home
+        </a>
+
+        <!-- Hamburger Button (Mobile Only) -->
+        <button id="mobileMenuBtn" class="bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white p-2.5 rounded-xl border border-slate-800 transition-all focus:outline-none md:hidden flex items-center justify-center" title="Navigation Menu">
+          <svg id="hamburgerIcon" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+          <svg id="closeIcon" class="w-5 h-5 hidden transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+
+        <!-- Notifications Dropdown -->
+        <div id="notificationDropdown" class="absolute right-0 top-14 w-80 glass border border-slate-800 rounded-2xl p-4 shadow-2xl hidden z-50 max-h-96 overflow-y-auto space-y-3">
+          <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <span>🔔</span> Tenant Payments
+            </h4>
+            <span id="alertCountText" class="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+              0 Unread
+            </span>
+          </div>
+          <div id="notificationList" class="space-y-2.5 max-h-60 overflow-y-auto pr-1 text-left">
+            <p class="text-[11px] text-slate-500 text-center py-4">No recent payments.</p>
+          </div>
+          <!-- Clear/Mark Read buttons -->
+          <div class="flex justify-between items-center border-t border-slate-850 pt-2 text-[10px]">
+            <button onclick="markNotificationsRead()" class="text-indigo-400 hover:text-indigo-300 font-bold">Mark all read</button>
+            <button onclick="clearNotifications()" class="text-rose-450 hover:text-rose-400 font-bold">Clear all</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Loader -->
+    <div id="adminLoader" class="text-center py-24">
+      <div class="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500 mb-2"></div>
+      <p class="text-slate-400">Verifying platform configuration...</p>
+    </div>
+
+    <!-- Main Grid Content -->
+    <div id="adminContent" class="hidden space-y-8 w-full">
+      
+      <!-- Desktop Tab Navigation -->
+      <div class="flex border-b border-slate-800 gap-2 overflow-x-auto pb-px" id="adminTabs">
+        <button onclick="switchTab('tenants')" id="tabBtn-tenants" class="px-5 py-3 border-b-2 border-indigo-500 text-indigo-400 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
+          <span>🏪</span> Store Tenants
+        </button>
+        <button onclick="switchTab('verification')" id="tabBtn-verification" class="px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
+          <span>📄</span> Payment Verification
+        </button>
+        <button onclick="switchTab('settings')" id="tabBtn-settings" class="px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
+          <span>💳</span> Global Settings
+        </button>
+      </div>
+
+      <!-- Tab Panels -->
+
+      <!-- Tab 1: Tenants -->
+      <div id="tabContent-tenants" class="tab-panel space-y-6">
+        <div id="storeTenantsCard" class="glass p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div class="flex justify-between items-center">
+            <h3 class="text-xl font-bold text-white flex items-center gap-2">
+              <span>🏪</span> Store Tenants
+            </h3>
+            <span id="storeCountBadge" class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold px-2.5 py-1 rounded-full">
+              0 Stores
+            </span>
+          </div>
+
+          <!-- Stores Directory Table -->
+          <div class="overflow-x-auto w-full">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="text-[10px] uppercase tracking-wider text-slate-555 border-b border-slate-900">
+                <tr>
+                  <th class="py-3 px-3">Shop Info</th>
+                  <th class="py-3 px-3">Date Joined</th>
+                  <th class="py-3 px-3">Active Rule</th>
+                  <th class="py-3 px-3">Manager Credentials</th>
+                  <th class="py-3 px-3 text-center">Status</th>
+                  <th class="py-3 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="storesTableBody">
+                <!-- Dynamically populated store rows -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Empty State -->
+          <div id="tableEmptyState" class="hidden text-center py-12 space-y-2 text-slate-500 text-sm">
+            <span class="text-3xl block">🏪</span>
+            <p>No stores registered on the platform yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Payment Verification -->
+      <div id="tabContent-verification" class="tab-panel space-y-6 hidden">
+        <div id="paymentVerificationCard" class="glass p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div class="flex justify-between items-center">
+            <h3 class="text-xl font-bold text-white flex items-center gap-2">
+              <span>📄</span> Payment Verification
+            </h3>
+            <div class="flex items-center gap-2">
+              <button 
+                onclick="recordPaymentPromptAdmin()"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5"
+              >
+                <span>+</span> Record Manual Payment
+              </button>
+              <span id="paymentsCountBadge" class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold px-2.5 py-1 rounded-full">
+                0 Payments
+              </span>
+            </div>
+          </div>
+
+          <!-- Payments Table -->
+          <div class="overflow-x-auto w-full">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="text-[10px] uppercase tracking-wider text-slate-555 border-b border-slate-900">
+                <tr>
+                  <th class="py-3 px-3">Store Name</th>
+                  <th class="py-3 px-3">Date Submitted</th>
+                  <th class="py-3 px-3 text-right">Amount</th>
+                  <th class="py-3 px-3">Reference Number</th>
+                  <th class="py-3 px-3 text-center">Status</th>
+                  <th class="py-3 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="paymentsTableBody">
+                <!-- Dynamically populated payment rows -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Empty State -->
+          <div id="paymentsEmptyState" class="hidden text-center py-12 space-y-2 text-slate-500 text-sm">
+            <span class="text-3xl block">💸</span>
+            <p>No payment requests submitted yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Settings -->
+      <div id="tabContent-settings" class="tab-panel space-y-6 hidden">
+        <div id="billingSettingsCard" class="glass p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo max-w-2xl mx-auto">
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <span>💳</span> Global Billing Info
+          </h3>
+          <p class="text-slate-400 text-xs leading-relaxed">
+            Configure the platform GCash payment QR code and instructions. This will display on the store owner dashboards (and blocking suspension screens) to request renewal.
+          </p>
+
+          <!-- GCash QR upload preview -->
+          <div class="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3 relative">
+            <div class="w-36 h-36 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden" id="qrPreviewContainer">
+              <span class="text-3xl" id="qrFallbackEmoji">📷</span>
+              <img id="qrPreviewImg" src="" alt="Payment QR Preview" class="hidden w-full h-full object-contain">
+            </div>
+            <label class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 font-bold text-xs py-2 px-4 rounded-xl border border-indigo-500/20 cursor-pointer transition-all">
+              Upload GCash QR
+              <input type="file" id="qrFileInput" accept="image/*" class="hidden">
+            </label>
+          </div>
+
+          <!-- Billing Instructions Form -->
+          <form id="billingForm" class="space-y-3">
+            <div>
+              <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1" for="billingInstructions">Instructions</label>
+              <textarea 
+                id="billingInstructions" 
+                rows="3"
+                placeholder="e.g. Scan GCash QR code to pay platform subscription fee..."
+                class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-350 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              ></textarea>
+            </div>
+
+            <div class="border-t border-slate-800 pt-3">
+              <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1" for="subscriptionMethod">Default Platform Subscription Plan</label>
+              <select 
+                id="subscriptionMethod" 
+                class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              >
+                <option value="onetime_daily">One-time System Fee + Daily Fee</option>
+                <option value="monthly">Flat Monthly Subscription</option>
+                <option value="per_stamp">Pay-As-You-Go per Stamp</option>
+              </select>
+            </div>
+
+            <!-- Grouped configurations for all 3 plans -->
+            <div class="border-t border-slate-800 pt-4 space-y-4">
+              <div class="flex justify-between items-center pb-1">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plan Pricing Settings</span>
+                <span class="text-[9px] text-indigo-400 font-bold bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded">All Editable</span>
+              </div>
+
+              <!-- Plan 1: One-time System Fee + Daily Fee -->
+              <div id="planSection-onetime_daily" class="p-4 rounded-2xl border border-slate-800/80 space-y-3 transition-all">
+                <div class="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <span>📅</span> Daily active plan (onetime_daily)
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[9px] font-bold text-slate-500 uppercase mb-1" for="onetimeSetupFee">System Developer Fee (₱)</label>
+                    <input 
+                      type="number" 
+                      id="onetimeSetupFee" 
+                      class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                      placeholder="e.g. 5000"
+                    >
+                  </div>
+                  <div>
+                    <label class="block text-[9px] font-bold text-slate-500 uppercase mb-1" for="dailyFee">Daily Fee (₱)</label>
+                    <input 
+                      type="number" 
+                      id="dailyFee" 
+                      class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                      placeholder="e.g. 50"
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <!-- Plan 2: Flat Monthly subscription -->
+              <div id="planSection-monthly" class="p-4 rounded-2xl border border-slate-800/80 space-y-3 transition-all">
+                <div class="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <span>🚀</span> flat monthly subscription (monthly)
+                </div>
+                <div>
+                  <label class="block text-[9px] font-bold text-slate-500 uppercase mb-1" for="monthlyFee">Monthly Flat Fee (₱)</label>
+                  <input 
+                    type="number" 
+                    id="monthlyFee" 
+                    class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                    placeholder="e.g. 1500"
+                  >
+                </div>
+              </div>
+
+              <!-- Plan 3: Pay-As-You-Go per Stamp -->
+              <div id="planSection-per_stamp" class="p-4 rounded-2xl border border-slate-800/80 space-y-3 transition-all">
+                <div class="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <span>🎟️</span> pay-as-you-go per stamp (per_stamp)
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[9px] font-bold text-slate-500 uppercase mb-1" for="perStampDeveloperFee">System Developer Fee (₱)</label>
+                    <input 
+                      type="number" 
+                      id="perStampDeveloperFee" 
+                      class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                      placeholder="e.g. 3000"
+                    >
+                  </div>
+                  <div>
+                    <label class="block text-[9px] font-bold text-slate-500 uppercase mb-1" for="perStampFee">Fee per Stamp (₱)</label>
+                    <input 
+                      type="number" 
+                      id="perStampFee" 
+                      class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                      placeholder="e.g. 1.00"
+                      step="0.1"
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-colors shadow-md"
+            >
+              Save Configuration
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  <!-- View Receipt Modal -->
+  <div id="viewReceiptModal" class="fixed inset-0 z-45 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-md transition-all duration-300 p-4">
+    <div class="w-full max-w-lg p-6 glass border border-indigo-500/10 rounded-3xl space-y-4 shadow-2xl relative overflow-hidden text-left bg-slate-900/95">
+      <button 
+        type="button" 
+        onclick="closeViewReceiptModal()" 
+        class="absolute top-4 right-4 text-slate-400 hover:text-white transition-all text-xl p-2 rounded-full hover:bg-white/5"
+      >
+        ✕
+      </button>
+
+      <div class="space-y-1">
+        <h3 class="text-lg font-black text-white">GCash Receipt Verification</h3>
+        <p class="text-xs text-slate-450">Review submitted receipt details below</p>
+      </div>
+
+      <!-- Image container -->
+      <div class="w-full h-80 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden relative">
+        <img id="modalReceiptImg" src="" alt="GCash Receipt" class="w-full h-full object-contain">
+        <p id="modalNoReceiptText" class="text-xs text-slate-550 hidden">No receipt image uploaded (Recorded manually by Admin)</p>
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <button 
+          type="button" 
+          onclick="closeViewReceiptModal()" 
+          class="w-full bg-slate-800 hover:bg-slate-750 text-slate-200 font-semibold py-2.5 rounded-xl text-xs border border-slate-700 transition-all text-center"
+        >
+          Close Preview
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backdrop overlay (no background blur) -->
+  <div id="mobileMenuBackdrop" class="fixed inset-0 z-30 bg-slate-950/60 hidden transition-opacity duration-300 opacity-0"></div>
+
+  <!-- Mobile Drawer Menu (solid slate backdrop for crisp unblurred view) -->
+  <div id="mobileMenuDrawer" class="fixed inset-y-0 right-0 z-40 w-72 bg-slate-950/98 border-l border-slate-800 p-6 flex flex-col justify-between shadow-2xl transition-transform duration-300 transform translate-x-full md:hidden">
+    <div class="space-y-6">
+      <div class="flex justify-between items-center border-b border-slate-850 pb-4">
+        <h4 class="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+          <span>📋</span> Dashboard Menu
+        </h4>
+      </div>
+
+      <!-- Scroll navigation options -->
+      <div class="flex flex-col gap-2">
+        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2.5">Dashboard Sections</span>
+        <button onclick="scrollToCard('storeTenantsCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
+          <span>🏪</span> Store Tenants
+        </button>
+        <button onclick="scrollToCard('billingSettingsCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
+          <span>💳</span> Billing Settings
+        </button>
+      </div>
+    </div>
+
+    <!-- Actions section in mobile drawer -->
+    <div class="space-y-3 border-t border-slate-850 pt-4 mb-8">
+      <a href="/" class="w-full bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800 rounded-xl py-3 px-4 text-xs font-semibold flex items-center justify-center gap-2.5 transition-all">
+        <span>🏠</span> Go back Home
+      </a>
+      <button onclick="logout()" class="w-full bg-rose-950/20 hover:bg-rose-950/40 text-rose-450 hover:text-rose-400 border border-rose-500/20 hover:border-rose-500/30 rounded-xl py-3 px-4 text-xs font-bold flex items-center justify-center gap-2 transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+        </svg>
+        Logout Admin
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Auth Elements
+    const loginOverlay = document.getElementById('loginOverlay');
+    const adminLoginForm = document.getElementById('adminLoginForm');
+    const loginCodeInput = document.getElementById('loginCode');
+    const loginError = document.getElementById('loginError');
+
+    // Controls
+    const adminLoader = document.getElementById('adminLoader');
+    const adminContent = document.getElementById('adminContent');
+    const storeCountBadge = document.getElementById('storeCountBadge');
+    const storesTableBody = document.getElementById('storesTableBody');
+    const tableEmptyState = document.getElementById('tableEmptyState');
+
+    // Edit Modal Elements
+    const editShopModal = document.getElementById('editShopModal');
+    const editShopForm = document.getElementById('editShopForm');
+    const editingShopSlugTitle = document.getElementById('editingShopSlugTitle');
+    const editShopName = document.getElementById('editShopName');
+    const editShopRule = document.getElementById('editShopRule');
+    const editOwnerUser = document.getElementById('editOwnerUser');
+    const editOwnerPass = document.getElementById('editOwnerPass');
+
+    // Billing settings Elements
+    const billingForm = document.getElementById('billingForm');
+    const billingInstructions = document.getElementById('billingInstructions');
+    const qrFileInput = document.getElementById('qrFileInput');
+    const qrPreviewImg = document.getElementById('qrPreviewImg');
+    const qrFallbackEmoji = document.getElementById('qrFallbackEmoji');
+
+    // Notifications Elements
+    const notificationBtn = document.getElementById('notificationBtn');
+    const notificationBadge = document.getElementById('notificationBadge');
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    const notificationList = document.getElementById('notificationList');
+    const alertCountText = document.getElementById('alertCountText');
+    const paymentsCountBadge = document.getElementById('paymentsCountBadge');
+    const paymentsTableBody = document.getElementById('paymentsTableBody');
+    const paymentsEmptyState = document.getElementById('paymentsEmptyState');
+
+    let shopsList = [];
+    let editingShopSlug = null;
+    let paymentQrBase64 = null;
+    let notificationsList = [];
+    let paymentsList = [];
+
+    // Helper fetch with SuperAdmin Code in headers
+    function fetchWithAuth(url, options = {}) {
+      if (!options.headers) {
+        options.headers = {};
+      }
+      
+      const code = sessionStorage.getItem('superadmin_code');
+      options.headers['x-superadmin-code'] = code;
+      
+      return fetch(url, options).then(response => {
+        if (response.status === 401) {
+          sessionStorage.removeItem('superadmin_code');
+          loginOverlay.classList.remove('hidden');
+          adminLoader.classList.add('hidden');
+          adminContent.classList.add('hidden');
+          throw new Error('Master session expired. Please re-authenticate.');
+        }
+        return response;
+      });
+    }
+
+    async function init() {
+      // Access check
+      if (!sessionStorage.getItem('superadmin_code')) {
+        loginOverlay.classList.remove('hidden');
+        adminLoader.classList.add('hidden');
+        return;
+      }
+
+      try {
+        // Fetch billing info
+        const settingsRes = await fetch('/api/superadmin/settings');
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json();
+          billingInstructions.value = settings.paymentInstructions || '';
+          
+          document.getElementById('subscriptionMethod').value = settings.subscriptionMethod || 'onetime_daily';
+          document.getElementById('onetimeSetupFee').value = settings.onetimeSetupFee !== undefined ? settings.onetimeSetupFee : 5000;
+          document.getElementById('dailyFee').value = settings.dailyFee !== undefined ? settings.dailyFee : 50;
+          document.getElementById('monthlyFee').value = settings.monthlyFee !== undefined ? settings.monthlyFee : 1500;
+          document.getElementById('perStampDeveloperFee').value = settings.perStampDeveloperFee !== undefined ? settings.perStampDeveloperFee : 3000;
+          document.getElementById('perStampFee').value = settings.perStampFee !== undefined ? settings.perStampFee : 1.0;
+          
+          // trigger change to highlight active plan card
+          document.getElementById('subscriptionMethod').dispatchEvent(new Event('change'));
+
+          if (settings.paymentQr) {
+            paymentQrBase64 = settings.paymentQr;
+            qrPreviewImg.src = settings.paymentQr;
+            qrPreviewImg.classList.remove('hidden');
+            qrFallbackEmoji.classList.add('hidden');
+          }
+        }
+
+        // Fetch registered shops
+        await loadShops();
+
+        // Fetch payments for verification
+        await loadPayments();
+
+        // Fetch payment notifications
+        await loadNotifications();
+
+        adminLoader.classList.add('hidden');
+        adminContent.classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadNotifications() {
+      if (!sessionStorage.getItem('superadmin_code')) return;
+      try {
+        const response = await fetchWithAuth('/api/superadmin/notifications');
+        if (!response.ok) throw new Error('Could not fetch notifications');
+        notificationsList = await response.json();
+        updateNotificationsUI();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function timeAgo(dateString) {
+      const date = new Date(dateString);
+      const seconds = Math.floor((new Date() - date) / 1000);
+      if (seconds < 5) return 'just now';
+      let interval = Math.floor(seconds / 31536000);
+      if (interval >= 1) return interval + 'y ago';
+      interval = Math.floor(seconds / 2592000);
+      if (interval >= 1) return interval + 'mo ago';
+      interval = Math.floor(seconds / 86400);
+      if (interval >= 1) return interval + 'd ago';
+      interval = Math.floor(seconds / 3600);
+      if (interval >= 1) return interval + 'h ago';
+      interval = Math.floor(seconds / 60);
+      if (interval >= 1) return interval + 'm ago';
+      return seconds + 's ago';
+    }
+
+    function updateNotificationsUI() {
+      const unreadCount = notificationsList.filter(n => !n.read).length;
+      
+      if (unreadCount > 0) {
+        notificationBadge.textContent = unreadCount;
+        notificationBadge.classList.remove('hidden');
+        alertCountText.textContent = `${unreadCount} Unread`;
+      } else {
+        notificationBadge.classList.add('hidden');
+        alertCountText.textContent = `0 Unread`;
+      }
+
+      notificationList.innerHTML = '';
+      if (notificationsList.length === 0) {
+        notificationList.innerHTML = `
+          <p class="text-[11px] text-slate-550 text-center py-6 leading-normal">
+            No recent payments.<br>Notifications appear when owners submit GCash payments.
+          </p>
+        `;
+        return;
+      }
+
+      notificationsList.forEach(n => {
+        const item = document.createElement('div');
+        item.className = `p-2.5 rounded-xl border text-[11px] space-y-1 text-left transition-all cursor-pointer hover:border-indigo-500/50 hover:bg-indigo-950/20 ${
+          n.read 
+            ? 'bg-slate-900/30 border-slate-900 text-slate-400' 
+            : 'bg-indigo-500/10 border-indigo-500/20 text-white font-medium'
+        }`;
+        
+        item.onclick = () => handleNotificationClick(n.shopSlug);
+        
+        item.innerHTML = `
+          <div class="flex justify-between items-start gap-1 text-left">
+            <span class="font-bold ${n.read ? 'text-slate-300' : 'text-indigo-400'}">${escapeHtml(n.shopName)}</span>
+            <span class="text-emerald-400 font-bold font-mono shrink-0">₱${n.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+          </div>
+          <div class="flex justify-between items-center text-[9px] text-slate-555 text-left">
+            <span>Simulated payment credited</span>
+            <span class="font-mono">${timeAgo(n.timestamp)}</span>
+          </div>
+        `;
+        notificationList.appendChild(item);
+      });
+    }
+
+    async function handleNotificationClick(shopSlug) {
+      notificationDropdown.classList.add('hidden');
+      switchTab('verification');
+      await loadPayments();
+      
+      const payment = paymentsList.find(p => p.shopId === shopSlug && p.status === 'pending') ||
+                      paymentsList.find(p => p.shopId === shopSlug);
+      
+      if (payment) {
+        setTimeout(() => {
+          const row = document.getElementById(`payment-row-${payment.id}`);
+          if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.classList.add('bg-indigo-600/30');
+            setTimeout(() => {
+              row.classList.remove('bg-indigo-600/30');
+            }, 2500);
+          }
+        }, 100);
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    async function markNotificationsRead() {
+      try {
+        const response = await fetchWithAuth('/api/superadmin/notifications/read', { method: 'POST' });
+        if (response.ok) {
+          notificationsList = await response.json();
+          updateNotificationsUI();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function clearNotifications() {
+      if (!confirm('Are you sure you want to clear all payment notifications?')) return;
+      try {
+        const response = await fetchWithAuth('/api/superadmin/notifications/clear', { method: 'POST' });
+        if (response.ok) {
+          notificationsList = await response.json();
+          updateNotificationsUI();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Toggle dropdown
+    notificationBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      notificationDropdown.classList.toggle('hidden');
+    });
+
+    // Close dropdown click outside
+    document.addEventListener('click', (e) => {
+      if (!notificationDropdown.classList.contains('hidden') && !notificationDropdown.contains(e.target) && !notificationBtn.contains(e.target)) {
+        notificationDropdown.classList.add('hidden');
+      }
+    });
+
+    window.markNotificationsRead = markNotificationsRead;
+    window.clearNotifications = clearNotifications;
+
+    async function loadShops() {
+      try {
+        const response = await fetchWithAuth('/api/superadmin/shops');
+        if (!response.ok) throw new Error('Could not retrieve shops list');
+        shopsList = await response.json();
+        
+        storeCountBadge.textContent = `${shopsList.length} Store${shopsList.length === 1 ? '' : 's'}`;
+        renderStoresTable();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderStoresTable() {
+      storesTableBody.innerHTML = '';
+      if (shopsList.length === 0) {
+        tableEmptyState.classList.remove('hidden');
+        return;
+      }
+      tableEmptyState.classList.add('hidden');
+
+      shopsList.forEach(shop => {
+        const row = document.createElement('tr');
+        row.className = 'border-b border-slate-900 hover:bg-slate-900/10 transition-all';
+        
+        const statusText = shop.isSuspended ? 'Suspended' : 'Active';
+        const statusBadgeColor = shop.isSuspended 
+          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
+          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+
+        const dateJoined = shop.createdAt 
+          ? new Date(shop.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+          : 'N/A';
+        
+        row.innerHTML = `
+          <td class="py-3 px-3">
+            <div class="text-white font-bold">${shop.name}</div>
+            <div class="text-[10px] text-slate-555 font-mono tracking-wide">/${shop.id}</div>
+          </td>
+          <td class="py-3 px-3 text-slate-400 font-mono">${dateJoined}</td>
+          <td class="py-3 px-3 text-slate-400 font-mono">${shop.rule}</td>
+          <td class="py-3 px-3 font-mono">
+            <span class="text-slate-500">U:</span> <span class="text-indigo-300 font-semibold">${shop.ownerUsername}</span><br>
+            <span class="text-slate-500">P:</span> <span class="text-indigo-300 font-semibold">${shop.ownerPassword}</span>
+          </td>
+          <td class="py-3 px-3 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${statusBadgeColor}">${statusText}</span>
+          </td>
+          <td class="py-3 px-3 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              <button 
+                onclick="openEditModal('${shop.id}')"
+                class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/20 px-2 py-1 rounded text-[10px] font-bold transition-all"
+              >
+                Edit
+              </button>
+              <button 
+                onclick="toggleSuspension('${shop.id}', ${!shop.isSuspended})"
+                class="${shop.isSuspended ? 'bg-emerald-600/20 text-emerald-400 border border-rose-500/20 hover:bg-emerald-650/30' : 'bg-amber-600/20 text-amber-400 border border-amber-500/20 hover:bg-amber-600/30'} px-2 py-1 rounded text-[10px] font-bold transition-all"
+              >
+                ${shop.isSuspended ? 'Unsuspend' : 'Suspend'}
+              </button>
+              <button 
+                onclick="deleteShop('${shop.id}')"
+                class="text-rose-500 hover:text-rose-450 p-1 rounded transition-all"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+              </button>
+            </div>
+          </td>
+        `;
+        storesTableBody.appendChild(row);
+      });
+    }
+
+    // Toggle Suspension action
+    async function toggleSuspension(slug, isSuspended) {
+      try {
+        const response = await fetchWithAuth(`/api/superadmin/shops/${slug}/suspend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isSuspended })
+        });
+        
+        if (!response.ok) throw new Error('Failed to update suspension status.');
+        alert(`Store ${isSuspended ? 'suspended' : 'unsuspended'} successfully!`);
+        await loadShops();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Delete Shop action
+    async function deleteShop(slug) {
+      if (!confirm(`CAUTION! Are you sure you want to delete store "${slug}"? All customer details, history, and rewards configurations will be permanently deleted.`)) {
+        return;
+      }
+
+      try {
+        const response = await fetchWithAuth(`/api/superadmin/shops/${slug}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete shop.');
+        alert('Store permanently deleted from platform.');
+        await loadShops();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Open Edit Shop Modal
+    function openEditModal(slug) {
+      editingShopSlug = slug;
+      const shop = shopsList.find(s => s.id === slug);
+      if (!shop) return;
+
+      editingShopSlugTitle.textContent = `/${slug}`;
+      editShopName.value = shop.name;
+      editShopRule.value = shop.rule;
+      editOwnerUser.value = shop.ownerUsername;
+      editOwnerPass.value = shop.ownerPassword;
+
+      editShopModal.classList.remove('hidden');
+    }
+
+    // Close Edit Modal
+    function closeEditModal() {
+      editShopModal.classList.add('hidden');
+      editingShopSlug = null;
+    }
+
+    // Edit Form submit
+    editShopForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!editingShopSlug) return;
+
+      const payload = {
+        name: editShopName.value,
+        rule: editShopRule.value,
+        ownerUsername: editOwnerUser.value,
+        ownerPassword: editOwnerPass.value
+      };
+
+      try {
+        const response = await fetchWithAuth(`/api/superadmin/shops/${editingShopSlug}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to save store changes.');
+        alert('Store details updated successfully!');
+        closeEditModal();
+        await loadShops();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    // Upload Payment QR code image
+    qrFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        alert('File size exceeds 2MB limit.');
+        qrFileInput.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        paymentQrBase64 = reader.result;
+        qrPreviewImg.src = paymentQrBase64;
+        qrPreviewImg.classList.remove('hidden');
+        qrFallbackEmoji.classList.add('hidden');
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Submit Billing details
+    billingForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const payload = {
+        paymentQr: paymentQrBase64,
+        paymentInstructions: billingInstructions.value.trim(),
+        subscriptionMethod: document.getElementById('subscriptionMethod').value,
+        onetimeSetupFee: document.getElementById('onetimeSetupFee').value,
+        systemDeveloperFee: document.getElementById('onetimeSetupFee').value,
+        dailyFee: document.getElementById('dailyFee').value,
+        monthlyFee: document.getElementById('monthlyFee').value,
+        perStampDeveloperFee: document.getElementById('perStampDeveloperFee').value,
+        perStampFee: document.getElementById('perStampFee').value
+      };
+
+      try {
+        const response = await fetchWithAuth('/api/superadmin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to save billing configuration.');
+        alert('Platform subscription and billing options updated successfully!');
+        await loadShops();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    // Super Admin login code submission
+    adminLoginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = loginCodeInput.value.trim();
+      
+      try {
+        const response = await fetch('/api/superadmin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Authentication failed.');
+        
+        sessionStorage.setItem('superadmin_code', code);
+        loginOverlay.classList.add('hidden');
+        loginError.classList.add('hidden');
+        
+        adminLoader.classList.remove('hidden');
+        await init();
+      } catch (err) {
+        loginError.textContent = err.message;
+        loginError.classList.remove('hidden');
+      }
+    });
+
+    // Log out operator
+    function logout() {
+      sessionStorage.removeItem('superadmin_code');
+      window.location.reload();
+    }
+
+    // Expose actions
+    window.openEditModal = openEditModal;
+    window.closeEditModal = closeEditModal;
+    window.toggleSuspension = toggleSuspension;
+    window.deleteShop = deleteShop;
+    window.logout = logout;
+    window.verifyAndConfirmPayment = verifyAndConfirmPayment;
+    window.recordPaymentPromptAdmin = recordPaymentPromptAdmin;
+    window.viewReceiptImage = viewReceiptImage;
+    window.closeViewReceiptModal = closeViewReceiptModal;
+
+    // Subscription elements active highlighting
+    const subscriptionMethod = document.getElementById('subscriptionMethod');
+
+    subscriptionMethod.addEventListener('change', () => {
+      ['onetime_daily', 'monthly', 'per_stamp'].forEach(m => {
+        const section = document.getElementById(`planSection-${m}`);
+        if (section) {
+          if (subscriptionMethod.value === m) {
+            section.classList.remove('border-slate-800/80');
+            section.classList.add('border-indigo-500/40', 'bg-indigo-500/5');
+          } else {
+            section.classList.remove('border-indigo-500/40', 'bg-indigo-500/5');
+            section.classList.add('border-slate-800/80');
+          }
+        }
+      });
+    });
+
+    async function recordPaymentPrompt(slug) {
+      const amountStr = prompt(`Record a GCash/settlement payment for store "${slug}":\nEnter amount paid (₱):`);
+      if (amountStr === null) return;
+      
+      const amount = parseFloat(amountStr);
+      if (isNaN(amount) || amount <= 0) {
+        alert('Please enter a valid positive payment amount.');
+        return;
+      }
+      
+      try {
+        const response = await fetchWithAuth(`/api/superadmin/shops/${slug}/payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount })
+        });
+        
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to record payment.');
+        }
+        
+        alert(`Payment of ₱${amount.toLocaleString()} successfully recorded for "${slug}"!`);
+        await loadShops();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+    window.recordPaymentPrompt = recordPaymentPrompt;
+
+    async function loadPayments() {
+      if (!sessionStorage.getItem('superadmin_code')) return;
+      try {
+        const response = await fetchWithAuth('/api/superadmin/payments');
+        if (!response.ok) throw new Error('Could not retrieve payments list');
+        paymentsList = await response.json();
+        
+        paymentsCountBadge.textContent = `${paymentsList.length} Payment${paymentsList.length === 1 ? '' : 's'}`;
+        renderPaymentsTable();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderPaymentsTable() {
+      paymentsTableBody.innerHTML = '';
+      if (paymentsList.length === 0) {
+        paymentsEmptyState.classList.remove('hidden');
+        return;
+      }
+      paymentsEmptyState.classList.add('hidden');
+
+      paymentsList.forEach(payment => {
+        const row = document.createElement('tr');
+        row.id = `payment-row-${payment.id}`;
+        row.className = 'border-b border-slate-900 hover:bg-slate-900/10 transition-all';
+        
+        const statusText = payment.status === 'confirmed' ? 'Confirmed' : 'Pending';
+        const statusBadgeColor = payment.status === 'confirmed'
+          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse';
+
+        const dateSubmitted = payment.timestamp 
+          ? new Date(payment.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : 'N/A';
+        
+        let actionsHtml = '';
+        if (payment.status === 'pending') {
+          actionsHtml = `
+            <button 
+              onclick="verifyAndConfirmPayment('${payment.id}')"
+              class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-bold transition-all shadow-md"
+            >
+              Confirm Receipt
+            </button>
+          `;
+        } else {
+          actionsHtml = `<span class="text-slate-500 text-[10px] font-medium font-mono">Confirmed</span>`;
+        }
+
+        let receiptColumnHtml = '';
+        if (payment.receiptImage) {
+          receiptColumnHtml = `
+            <div class="flex flex-col gap-1 items-start">
+              <button 
+                onclick="viewReceiptImage('${payment.id}')"
+                class="bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded text-[10px] font-bold transition-all shadow-sm"
+              >
+                View Receipt Image
+              </button>
+              <span class="text-[9px] text-slate-500 font-mono">${escapeHtml(payment.referenceNumber)}</span>
+            </div>
+          `;
+        } else {
+          receiptColumnHtml = `
+            <span class="text-slate-400 text-[10px] font-medium font-mono">${escapeHtml(payment.referenceNumber)}</span>
+          `;
+        }
+
+        row.innerHTML = `
+          <td class="py-3 px-3">
+            <div class="text-white font-bold">${escapeHtml(payment.shopName)}</div>
+            <div class="text-[10px] text-slate-555 font-mono tracking-wide">/${payment.shopId}</div>
+          </td>
+          <td class="py-3 px-3 text-slate-400 font-mono">${dateSubmitted}</td>
+          <td class="py-3 px-3 text-right text-emerald-400 font-bold font-mono">₱${payment.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+          <td class="py-3 px-3">
+            ${receiptColumnHtml}
+          </td>
+          <td class="py-3 px-3 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${statusBadgeColor}">${statusText}</span>
+          </td>
+          <td class="py-3 px-3 text-right">
+            ${actionsHtml}
+          </td>
+        `;
+        paymentsTableBody.appendChild(row);
+      });
+    }
+
+    function viewReceiptImage(paymentId) {
+      const payment = paymentsList.find(p => p.id === paymentId);
+      const modalReceiptImg = document.getElementById('modalReceiptImg');
+      const modalNoReceiptText = document.getElementById('modalNoReceiptText');
+      
+      if (payment && payment.receiptImage) {
+        modalReceiptImg.src = payment.receiptImage;
+        modalReceiptImg.classList.remove('hidden');
+        modalNoReceiptText.classList.add('hidden');
+      } else {
+        modalReceiptImg.classList.add('hidden');
+        modalNoReceiptText.classList.remove('hidden');
+      }
+      
+      document.getElementById('viewReceiptModal').classList.remove('hidden');
+    }
+
+    function closeViewReceiptModal() {
+      document.getElementById('viewReceiptModal').classList.add('hidden');
+    }
+
+    async function verifyAndConfirmPayment(paymentId) {
+      if (!confirm('Are you sure you want to verify and confirm this payment? This will update the shop\'s balance immediately.')) {
+        return;
+      }
+      try {
+        const response = await fetchWithAuth(`/api/superadmin/payments/${paymentId}/confirm`, {
+          method: 'POST'
+        });
+        if (!response.ok) throw new Error('Failed to confirm payment.');
+        alert('Payment confirmed and verified successfully!');
+        await loadPayments();
+        await loadShops();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function recordPaymentPromptAdmin() {
+      const slug = prompt('Enter Store ID/Slug to record payment for:\nAvailable stores: ' + shopsList.map(s => s.id).join(', '));
+      if (slug === null) return;
+      const cleanSlug = slug.toLowerCase().trim();
+      
+      const shop = shopsList.find(s => s.id === cleanSlug);
+      if (!shop) {
+        alert('Store with ID "' + slug + '" not found.');
+        return;
+      }
+      
+      const amountStr = prompt('Record manual/cash payment for store "' + shop.name + '" (' + cleanSlug + '):\nEnter amount (₱):');
+      if (amountStr === null) return;
+      
+      const amount = parseFloat(amountStr);
+      if (isNaN(amount) || amount <= 0) {
+        alert('Please enter a valid positive payment amount.');
+        return;
+      }
+      
+      try {
+        const response = await fetchWithAuth('/api/superadmin/shops/' + cleanSlug + '/payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount })
+        });
+        
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to record payment.');
+        }
+        
+        alert('Manual payment of ₱' + amount.toLocaleString() + ' recorded and confirmed for "' + shop.name + '"!');
+        await loadShops();
+        await loadPayments();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // --- MOBILE DRAWER MENUS FUNCTIONS ---
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenuDrawer = document.getElementById('mobileMenuDrawer');
+    const mobileMenuBackdrop = document.getElementById('mobileMenuBackdrop');
+    const hamburgerIcon = document.getElementById('hamburgerIcon');
+    const closeIcon = document.getElementById('closeIcon');
+
+    function openMobileMenu() {
+      mobileMenuDrawer.classList.remove('translate-x-full');
+      mobileMenuBackdrop.classList.remove('hidden');
+      setTimeout(() => {
+        mobileMenuBackdrop.classList.remove('opacity-0');
+      }, 10);
+      hamburgerIcon.classList.add('hidden');
+      closeIcon.classList.remove('hidden');
+    }
+
+    function closeMobileMenu() {
+      mobileMenuDrawer.classList.add('translate-x-full');
+      mobileMenuBackdrop.classList.add('opacity-0');
+      setTimeout(() => {
+        mobileMenuBackdrop.classList.add('hidden');
+      }, 300);
+      hamburgerIcon.classList.remove('hidden');
+      closeIcon.classList.add('hidden');
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      const activePanel = document.getElementById(`tabContent-${tabId}`);
+      if (activePanel) activePanel.classList.remove('hidden');
+      
+      document.querySelectorAll('#adminTabs button').forEach(btn => {
+        if (btn.id === `tabBtn-${tabId}`) {
+          btn.classList.remove('border-indigo-500', 'text-indigo-400');
+          btn.classList.remove('border-transparent', 'text-slate-400');
+          btn.classList.add('border-indigo-500', 'text-indigo-400');
+        } else {
+          btn.classList.remove('border-indigo-500', 'text-indigo-400');
+          btn.classList.remove('border-transparent', 'text-slate-400');
+          btn.classList.add('border-transparent', 'text-slate-400');
+        }
+      });
+    }
+
+    function scrollToCard(cardId) {
+      let tabId = 'tenants';
+      if (cardId === 'billingSettingsCard') {
+        tabId = 'settings';
+      }
+      
+      switchTab(tabId);
+      
+      const card = document.getElementById(cardId);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth' });
+        closeMobileMenu();
+      }
+    }
+
+    mobileMenuBtn.addEventListener('click', () => {
+      const isOpen = !mobileMenuDrawer.classList.contains('translate-x-full');
+      if (isOpen) {
+        closeMobileMenu();
+      } else {
+        openMobileMenu();
+      }
+    });
+
+    mobileMenuBackdrop.addEventListener('click', closeMobileMenu);
+
+    window.scrollToCard = scrollToCard;
+    window.switchTab = switchTab;
+
+    // Auto-refresh data and notifications every 5 seconds for live dashboard tracking
+    setInterval(() => {
+      if (adminContent.classList.contains('hidden') === false) {
+        loadShops();
+        loadPayments();
+        loadNotifications();
+      }
+    }, 5000);
+
+    init();
+  </script>
+</body>
+</html>

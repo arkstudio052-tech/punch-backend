@@ -1,0 +1,2536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Owner Dashboard | PUNCH</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script>
+    (function() {
+      const originalFetch = window.fetch;
+      window.fetch = function(input, init) {
+        if (typeof input === 'string' && input.startsWith('/api/')) {
+          input = (window.API_BASE || '') + input;
+        }
+        return originalFetch(input, init);
+      };
+    })();
+  </script>
+</head>
+<body class="flex flex-col items-center justify-start min-h-screen p-4 md:p-8 bg-slate-950">
+
+  <!-- Owner Authentication Login Overlay -->
+  <div id="loginOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md transition-all duration-300">
+    <div class="w-full max-w-md p-8 glass border border-indigo-500/10 rounded-3xl space-y-6 text-center shadow-2xl relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      
+      <div class="space-y-3">
+        <!-- Logo container -->
+        <div class="w-20 h-20 mx-auto rounded-2xl border border-slate-800 flex items-center justify-center bg-slate-900 shadow-lg glow-indigo shrink-0 overflow-hidden" id="loginLogoContainer">
+          <span class="text-4xl" id="loginShopEmoji">🔐</span>
+          <img id="loginShopLogo" src="" alt="Shop Logo" class="hidden w-full h-full object-cover">
+        </div>
+        <h2 class="text-2xl font-black text-white" id="loginShopName">Owner Portal Sign In</h2>
+        <p class="text-xs text-slate-450">Please enter your store manager credentials to access this dashboard.</p>
+      </div>
+      
+      <form id="ownerLoginForm" class="space-y-4 text-left">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="loginUsername">Username</label>
+          <input 
+            type="text" 
+            id="loginUsername" 
+            placeholder="Username" 
+            class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-white placeholder-slate-650 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono"
+            required
+          >
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="loginPassword">Password</label>
+          <input 
+            type="password" 
+            id="loginPassword" 
+            placeholder="Password" 
+            class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-white placeholder-slate-650 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono"
+            required
+          >
+        </div>
+        <button 
+          type="submit" 
+          class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md mt-2"
+        >
+          Access Dashboard
+        </button>
+      </form>
+      <div id="loginError" class="hidden text-xs text-rose-450 font-bold mt-2"></div>
+      <p class="text-[10px] text-slate-500 leading-normal">
+        Defaults to admin / admin if credentials weren't customized on registration.
+      </p>
+    </div>
+  </div>
+
+  <!-- Shop Suspended Overlay -->
+  <div id="suspendedOverlay" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/98 backdrop-blur-md transition-all duration-300">
+    <div class="w-full max-w-lg p-8 glass border border-rose-500/20 rounded-3xl space-y-6 text-center shadow-2xl relative overflow-hidden">
+      <!-- Rose glow details -->
+      <div class="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute bottom-0 left-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      
+      <div class="space-y-2">
+        <span class="text-5xl">🚫</span>
+        <h2 class="text-2xl font-black text-white">Loyalty Portal Suspended</h2>
+        <p id="suspensionReason" class="text-xs text-rose-450 font-semibold leading-relaxed">
+          This store loyalty portal has been suspended by the platform administrator.
+        </p>
+      </div>
+
+      <!-- Subscription billing details statement -->
+      <div id="suspendedBillingDetails" class="w-full"></div>
+
+      <!-- Payment Settings displays -->
+      <div id="suspendedBillingContainer" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-5 text-left space-y-4">
+        <div class="text-xs font-bold uppercase text-slate-500 tracking-wider">Settlement Instructions</div>
+        <p id="suspendedInstructions" class="text-xs text-slate-300 leading-normal"></p>
+        
+        <div class="flex flex-col items-center justify-center pt-2">
+          <div class="w-44 h-44 bg-white rounded-xl p-2 border border-slate-800 flex items-center justify-center">
+            <img id="suspendedQrImg" src="" alt="Payment QR code" class="w-full h-full object-contain">
+          </div>
+          <span class="text-[10px] text-slate-500 mt-2">Scan with GCash / e-Wallet</span>
+        </div>
+      </div>
+
+      <div class="text-xs text-slate-500 pt-2 leading-relaxed">
+        If you have already processed the renewal, please wait a few moments or contact support at billing@punch.app for instant reactivation.
+      </div>
+      
+      <a href="/" class="inline-block bg-slate-900 hover:bg-slate-850 text-slate-350 px-6 py-2.5 rounded-xl border border-slate-800 text-xs transition-all font-semibold">
+        ← Go back Home
+      </a>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="w-full max-w-5xl space-y-8">
+    
+    <!-- Top Header -->
+    <header class="flex justify-between items-center border-b border-slate-800 pb-6 w-full gap-4">
+      <div class="flex items-center gap-3.5 min-w-0">
+        <!-- Header Logo -->
+        <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center overflow-hidden shrink-0" id="headerLogoContainer">
+          <span class="text-2xl" id="headerEmojiFallback">⚙️</span>
+          <img id="headerLogoImg" src="" alt="Logo" class="hidden w-full h-full object-cover">
+        </div>
+        <div class="space-y-0.5 text-left truncate">
+          <h1 class="text-xl md:text-2xl font-extrabold text-white truncate">Owner Dashboard</h1>
+          <p class="text-slate-400 text-xs truncate">
+            Managing loyalty portal for: <span id="shopTitleSlug" class="text-indigo-400 font-mono font-semibold">...</span>
+          </p>
+        </div>
+      </div>
+      
+      <!-- Header Controls -->
+      <div class="flex items-center gap-2 md:gap-4 relative shrink-0">
+        <!-- Notification Button -->
+        <button id="notificationBtn" class="relative bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white p-2.5 rounded-xl border border-slate-800 transition-all focus:outline-none" title="Notifications">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+          </svg>
+          <span id="notificationBadge" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full hidden border border-slate-950">
+            0
+          </span>
+        </button>
+ 
+        <!-- Sign Out Button (Desktop Only) -->
+        <button id="signOutBtn" class="bg-slate-900 hover:bg-rose-950/40 text-slate-300 hover:text-rose-450 p-2.5 rounded-xl border border-slate-800 hover:border-rose-500/25 transition-all focus:outline-none hidden md:block" title="Sign Out">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+          </svg>
+        </button>
+ 
+        <!-- Hamburger Button (Mobile Only) -->
+        <button id="mobileMenuBtn" class="bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white p-2.5 rounded-xl border border-slate-800 transition-all focus:outline-none md:hidden flex items-center justify-center" title="Navigation Menu">
+          <svg id="hamburgerIcon" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+          <svg id="closeIcon" class="w-5 h-5 hidden transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+
+        <!-- Notifications Dropdown -->
+        <div id="notificationDropdown" class="absolute right-0 top-14 w-80 glass border border-slate-800 rounded-2xl p-4 shadow-2xl hidden z-50 max-h-96 overflow-y-auto space-y-3">
+          <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <span>🔔</span> Customer Alerts
+            </h4>
+            <span id="alertCountText" class="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+              0 Active
+            </span>
+          </div>
+          <div id="notificationList" class="space-y-2.5">
+            <p class="text-[11px] text-slate-500 text-center py-4">No new customer notifications.</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard Loader -->
+    <div id="dashboardLoader" class="text-center py-24">
+      <div class="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500 mb-2"></div>
+      <p class="text-slate-400">Loading manager console...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="hidden glass p-12 rounded-3xl border-rose-500/20 text-center space-y-4 max-w-md mx-auto">
+      <span class="text-5xl">⚠️</span>
+      <h3 class="text-2xl font-bold text-white">Shop Manager Unavailable</h3>
+      <p class="text-slate-400 text-sm">We could not retrieve details for this store. Check the URL slug handle.</p>
+      <a href="/" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-all">
+        Create a Shop
+      </a>
+    </div>
+
+    <!-- Main Grid Content -->
+    <div id="dashboardContent" class="hidden space-y-8 w-full">
+
+      <!-- Trial Expired Warning Banner -->
+      <div id="trialExpiredBanner" class="hidden glass p-5 rounded-2xl border border-rose-500/20 bg-rose-950/20 text-slate-200 text-xs flex flex-col md:flex-row items-center justify-between gap-4 shadow-md animate-pulse">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">⚠️</span>
+          <div class="space-y-0.5 text-left">
+            <p class="font-bold text-white text-sm">Your Free Trial Has Expired</p>
+            <p class="text-slate-400">Cashier scanner functions and customer loyalty points cards are suspended. Please subscribe below to reactivate your portal services.</p>
+          </div>
+        </div>
+        <button onclick="scrollToCard('dashboardBillingCard')" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 px-5 rounded-xl transition-all shrink-0 text-xs shadow-md">
+          Subscribe Now
+        </button>
+      </div>
+      
+      <!-- Desktop Tab Navigation -->
+      <div class="flex border-b border-slate-800 gap-2 overflow-x-auto pb-px" id="ownerTabs">
+        <button onclick="switchTab('console')" id="tabBtn-console" class="px-5 py-3 border-b-2 border-indigo-500 text-indigo-400 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
+          <span>📋</span> Manager Console
+        </button>
+        <button onclick="switchTab('catalog')" id="tabBtn-catalog" class="px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
+          <span>🎁</span> Rewards & Branding
+        </button>
+        <button onclick="switchTab('subscription')" id="tabBtn-subscription" class="px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
+          <span>💳</span> Subscription & Billing
+        </button>
+      </div>
+
+      <!-- Tab Panels -->
+
+      <!-- Tab 1: Console -->
+      <div id="tabContent-console" class="tab-panel grid md:grid-cols-3 gap-8">
+        <!-- Left Column: Controls -->
+        <div class="md:col-span-1 space-y-6">
+          <!-- Add stamp via manual scan simulation -->
+          <div id="scanSimCard" class="glass p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>📷</span> Scan Simulator
+            </h3>
+            <p class="text-slate-400 text-xs leading-relaxed">
+              Usually, cashiers scan a customer's loyalty QR code. Simulate that here by entering the customer's phone number.
+            </p>
+            <form id="scanSimForm" class="space-y-3">
+              <div>
+                <input 
+                  type="text" 
+                  id="scanPhoneInput" 
+                  placeholder="e.g. 09171234567" 
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-650 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono"
+                  required
+                >
+              </div>
+              <button 
+                type="submit" 
+                class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-sm shadow-md"
+              >
+                Add Loyalty Point (+1)
+              </button>
+            </form>
+          </div>
+
+          <!-- Verify Redemption Code Card -->
+          <div id="confirmRedeemCard" class="glass p-6 rounded-2xl border border-amber-500/20 space-y-4 glow-indigo">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>🎁</span> Confirm Redemption
+            </h3>
+            <p class="text-slate-400 text-xs leading-relaxed">
+              Enter the 4-digit code shown on the customer's phone to verify and mark the reward as redeemed.
+            </p>
+            <form id="redeemForm" class="space-y-3">
+              <div>
+                <input 
+                  type="text" 
+                  id="redeemCodeInput" 
+                  placeholder="4-Digit Code (e.g. 4892)" 
+                  maxlength="4"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-650 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all font-mono text-center text-lg tracking-widest font-black"
+                  required
+                >
+              </div>
+              <button 
+                type="submit" 
+                class="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black py-2.5 px-4 rounded-xl transition-all text-sm shadow-md uppercase tracking-wider"
+              >
+                Verify & Claim Reward
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Right Column: Registered Customers -->
+        <div class="md:col-span-2 space-y-6">
+          <!-- Customers Card -->
+          <div id="customersCard" class="glass p-6 rounded-2xl border border-slate-800 space-y-4">
+            <div class="flex justify-between items-center">
+              <h3 class="text-xl font-bold text-white">Registered Customers</h3>
+              <span id="customerCountBadge" class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold px-2.5 py-1 rounded-full">
+                0 Customers
+              </span>
+            </div>
+
+            <!-- Customers Table Wrapper -->
+            <div class="overflow-x-auto w-full">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                  <tr>
+                    <th class="py-3 px-4">Customer Details</th>
+                    <th class="py-3 px-4">Joined Date</th>
+                    <th class="py-3 px-4 text-center">Stamps</th>
+                    <th class="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="customersTableBody">
+                  <!-- Dynamically populated rows -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="tableEmptyState" class="hidden text-center py-12 space-y-3">
+              <span class="text-3xl block">👥</span>
+              <p class="text-slate-400 text-sm">No customers registered yet.</p>
+              <p class="text-xs text-slate-500">Share your customer portal link to get customers registered!</p>
+              <input 
+                type="text" 
+                id="shareLinkField" 
+                readonly 
+                class="w-full max-w-sm bg-slate-900 border border-slate-800 text-center font-mono text-xs rounded-lg p-2 text-indigo-400 focus:outline-none"
+              >
+            </div>
+          </div>
+
+          <!-- Claims History Card -->
+          <div id="historyCard" class="glass p-6 rounded-2xl border border-slate-800 space-y-4">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>🏆</span> Recent Redemptions History
+            </h3>
+            <div class="overflow-x-auto w-full">
+              <table class="w-full text-left text-xs text-slate-400">
+                <thead class="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-900">
+                  <tr>
+                    <th class="py-2.5 px-3">Customer Details</th>
+                    <th class="py-2.5 px-3">Claim Date</th>
+                    <th class="py-2.5 px-3 text-center">Redeemed</th>
+                    <th class="py-2.5 px-3 text-right">Redeem Code</th>
+                  </tr>
+                </thead>
+                <tbody id="redemptionsTableBody">
+                  <!-- Dynamically populated claim rows -->
+                </tbody>
+              </table>
+            </div>
+            <!-- Empty State -->
+            <div id="redemptionsEmptyState" class="hidden text-center py-6 text-slate-500 text-xs">
+              No rewards claimed yet.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Rewards & Branding -->
+      <div id="tabContent-catalog" class="tab-panel grid md:grid-cols-3 gap-8 hidden">
+        <!-- Left Column: Rules & Logo -->
+        <div class="md:col-span-1 space-y-6">
+          <!-- Shop Rules Summary Card -->
+          <div class="glass p-6 rounded-2xl border border-indigo-500/10 space-y-4">
+            <h3 class="text-lg font-bold text-white">Store Rules</h3>
+            <div class="space-y-3">
+              <div>
+                <span class="block text-xs font-semibold text-slate-500 uppercase">Shop Name</span>
+                <span class="text-md text-white font-semibold" id="shopDisplayName">...</span>
+              </div>
+              <div>
+                <span class="block text-xs font-semibold text-slate-500 uppercase">Loyalty Reward System</span>
+                <span class="text-md text-amber-400 font-semibold" id="shopDisplayRule">...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Store Logo Card -->
+          <div class="glass p-6 rounded-2xl border border-slate-800 space-y-4">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>🖼️</span> Store Logo
+            </h3>
+            <div class="flex items-center gap-4">
+              <div class="w-16 h-16 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center overflow-hidden" id="logoPreviewContainer">
+                <span class="text-3xl" id="logoEmojiFallback">🏪</span>
+                <img id="logoPreviewImg" src="" alt="Logo Preview" class="hidden w-full h-full object-cover">
+              </div>
+              <div class="flex-grow">
+                <label class="block bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 font-semibold text-xs py-2 px-3 rounded-lg border border-indigo-500/20 cursor-pointer text-center transition-all">
+                  Choose Image
+                  <input type="file" id="logoFileInput" accept="image/*" class="hidden">
+                </label>
+                <p class="text-[10px] text-slate-550 mt-1.5">PNG, JPG, or SVG. Max 2MB.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Catalog List & Specials -->
+        <div class="md:col-span-2 space-y-6">
+          <!-- Rewards Catalog Card -->
+          <div id="catalogCard" class="glass p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo">
+            <h3 class="text-lg font-bold text-white flex items-center justify-between">
+              <span class="flex items-center gap-2"><span>🎁</span> Rewards Catalog</span>
+              <span class="text-[10px] text-slate-400 font-mono tracking-wider bg-slate-900 px-2 py-0.5 rounded border border-slate-800 uppercase">Seasonal Catalog</span>
+            </h3>
+            <p class="text-slate-400 text-xs leading-relaxed">
+              Create custom reward options (e.g. 15 stamps = 1 free large fries) and activate/deactivate them seasonally. Customers' stamp cards will adjust instantly.
+            </p>
+            
+            <!-- Add Reward Form -->
+            <form id="addRewardForm" class="space-y-3 border-b border-slate-850 pb-4">
+              <div class="grid grid-cols-3 gap-2">
+                <div class="col-span-1">
+                  <input 
+                    type="number" 
+                    id="rewardPointsInput" 
+                    placeholder="Stamps" 
+                    min="1"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder-slate-605 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm font-semibold text-center"
+                    required
+                  >
+                </div>
+                <div class="col-span-2">
+                  <input 
+                    type="text" 
+                    id="rewardTextInput" 
+                    placeholder="e.g. 1 Free Large Fries" 
+                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder-slate-605 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm"
+                    required
+                  >
+                </div>
+              </div>
+              <button 
+                type="submit" 
+                class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md"
+              >
+                + Create Reward Option
+              </button>
+            </form>
+
+            <!-- Reward List -->
+            <div id="rewardListContainer" class="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              <!-- Dynamically populated rewards -->
+            </div>
+          </div>
+
+          <!-- Specials Card -->
+          <div class="glass p-6 rounded-2xl border border-slate-800 space-y-4" id="specialsCard">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>📢</span> Specials & Menu Items
+            </h3>
+            <p class="text-slate-400 text-xs">
+              Edit the marketing items displayed on customer cards. Put each item on a new line.
+            </p>
+            <form id="specialsForm" class="space-y-3">
+              <textarea 
+                id="specialsTextarea" 
+                rows="5"
+                placeholder="e.g. Mocha Latte - $4.00&#10;Matcha Cookie - Buy 1 Get 1"
+                class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+              ></textarea>
+              <button 
+                type="submit" 
+                class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-xl transition-colors text-sm shadow-md"
+              >
+                Update Specials
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Subscription & Billing -->
+      <div id="tabContent-subscription" class="tab-panel grid md:grid-cols-3 gap-8 hidden">
+        <!-- Left Column: Current Statement -->
+        <div class="md:col-span-1 space-y-6">
+          <!-- Platform Billing Info Card -->
+          <div id="dashboardBillingCard" class="glass p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo hidden">
+            <h3 class="text-md font-bold text-white flex items-center gap-2">
+              <span>💳</span> Platform Billing Info
+            </h3>
+
+            <!-- Subscription billing details statement -->
+            <div id="activeBillingDetails" class="border-b border-slate-850 pb-3"></div>
+
+            <p id="dashboardBillingInstructions" class="text-slate-350 text-[11px] leading-relaxed"></p>
+            <div class="flex items-center justify-center pt-2">
+              <div class="w-32 h-32 bg-white rounded-lg p-1.5 border border-slate-800 flex items-center justify-center">
+                <img id="dashboardBillingQrImg" src="" alt="GCash payment QR" class="w-full h-full object-contain">
+              </div>
+            </div>
+            <p class="text-[9px] text-slate-550 text-center uppercase tracking-wider font-semibold">Settlement Method: GCash / Scan QR</p>
+          </div>
+        </div>
+
+        <!-- Right Column: GCash Payment Simulation Card / Trial Status -->
+        <div class="md:col-span-2 space-y-6">
+          <!-- Trial Status Card (visible during trial) -->
+          <div id="trialStatusCard" class="glass p-6 rounded-2xl border border-indigo-500/10 space-y-5 glow-indigo hidden text-left">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>🎁</span> Free Trial Active
+            </h3>
+            <p class="text-slate-400 text-xs leading-relaxed">
+              Your store loyalty portal is currently on the 7-day free trial. You have full access to all features to test the system before starting a paid subscription.
+            </p>
+            
+            <!-- Progress indicator -->
+            <div class="space-y-2">
+              <div class="flex justify-between text-xs font-semibold text-slate-350">
+                <span>Trial Countdown</span>
+                <span id="trialDaysLeftText" class="font-mono text-indigo-400">6 / 7 Days Remaining</span>
+              </div>
+              <!-- Progress bar track -->
+              <div class="w-full bg-slate-950 rounded-full h-3.5 border border-slate-850 overflow-hidden p-0.5">
+                <div id="trialProgressBar" class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-500" style="width: 85%;"></div>
+              </div>
+            </div>
+            
+            <div class="border-t border-slate-850 pt-4 mt-2 flex justify-end">
+              <button 
+                type="button" 
+                onclick="showPaidSubscriptionInfo()"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all text-xs shadow-md flex items-center justify-center gap-2"
+              >
+                🚀 Upgrade to Premium Plan
+              </button>
+            </div>
+          </div>
+
+
+          <!-- Payment History & Receipts Card -->
+          <div id="paymentHistoryCard" class="glass p-6 rounded-2xl border border-slate-800 space-y-4">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>📄</span> Payment History & Receipts
+            </h3>
+            <div class="overflow-x-auto w-full">
+              <table class="w-full text-left text-xs text-slate-300">
+                <thead class="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-900">
+                  <tr>
+                    <th class="py-2.5 px-3">Date Submitted</th>
+                    <th class="py-2.5 px-3">Reference Number</th>
+                    <th class="py-2.5 px-3 text-right">Amount</th>
+                    <th class="py-2.5 px-3 text-center">Status</th>
+                    <th class="py-2.5 px-3 text-right">Receipt</th>
+                  </tr>
+                </thead>
+                <tbody id="ownerPaymentsTableBody">
+                  <!-- Dynamically populated payment history rows -->
+                </tbody>
+              </table>
+            </div>
+            <!-- Empty State -->
+            <div id="ownerPaymentsEmptyState" class="hidden text-center py-6 text-slate-500 text-xs">
+              No payment transactions recorded yet.
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Subscription Plan Selector Modal -->
+  <div id="planSelectorModal" class="fixed inset-0 z-45 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-md transition-all duration-300 p-4">
+    <div class="w-full max-w-4xl p-8 glass border border-indigo-500/10 rounded-3xl space-y-6 shadow-2xl relative overflow-hidden text-left bg-slate-900/95 max-h-[90vh] overflow-y-auto">
+      <button 
+        type="button" 
+        onclick="closePlanSelectorModal()" 
+        class="absolute top-4 right-4 text-slate-400 hover:text-white transition-all text-xl p-2 rounded-full hover:bg-white/5"
+      >
+        ✕
+      </button>
+
+      <!-- Wizard Step Indicator -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <div id="wizardStepHeader-1" class="text-indigo-400 font-extrabold flex items-center gap-1.5 transition-all">
+          <span class="w-5 h-5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-500/35 flex items-center justify-center text-[10px]">1</span> Select Plan
+        </div>
+        <div class="text-slate-700">➔</div>
+        <div id="wizardStepHeader-2" class="flex items-center gap-1.5 transition-all text-slate-500">
+          <span class="w-5 h-5 rounded-full bg-slate-950 text-slate-500 border border-slate-800 flex items-center justify-center text-[10px]">2</span> Plan Details
+        </div>
+        <div class="text-slate-700">➔</div>
+        <div id="wizardStepHeader-3" class="flex items-center gap-1.5 transition-all text-slate-500">
+          <span class="w-5 h-5 rounded-full bg-slate-950 text-slate-500 border border-slate-800 flex items-center justify-center text-[10px]">3</span> Payment
+        </div>
+      </div>
+
+      <!-- Step 1: Choose Subscription Plan -->
+      <div id="planWizardStep1" class="space-y-6">
+        <div class="space-y-1">
+          <h3 class="text-xl font-black text-white flex items-center gap-2">
+            <span>🚀</span> Choose Subscription Plan
+          </h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Select your store subscription billing method. Recalculate your dues instantly, pay via GCash, and verify statement updates in real-time.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          <!-- Plan 1: Daily active fee -->
+          <div onclick="selectSubscriptionPlan('onetime_daily')" id="planCard-onetime_daily" class="glass p-4 rounded-xl border border-slate-800 hover:border-indigo-500/50 cursor-pointer transition-all space-y-2 flex flex-col justify-between hover:bg-slate-900/10 relative">
+            <div class="space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Daily Plan</span>
+                <span id="planBadge-onetime_daily" class="text-[8px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.5 rounded font-black uppercase hidden">Selected</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Daily active</h4>
+              <p id="planDesc-onetime_daily" class="text-[10px] text-slate-400 leading-snug">₱5,000 System Developer Fee (One-time) + ₱50/day active. Best for standard stores.</p>
+            </div>
+            <div class="text-[10px] text-slate-500 border-t border-slate-850 pt-2 font-semibold flex justify-between items-center">
+              <span>Usage Rate</span>
+              <span id="planRate-onetime_daily" class="text-white font-mono">₱50/day</span>
+            </div>
+          </div>
+
+          <!-- Plan 2: Flat Monthly subscription -->
+          <div onclick="selectSubscriptionPlan('monthly')" id="planCard-monthly" class="glass p-4 rounded-xl border border-slate-800 hover:border-indigo-500/50 cursor-pointer transition-all space-y-2 flex flex-col justify-between hover:bg-slate-900/10 relative">
+            <div class="space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Monthly Plan</span>
+                <span id="planBadge-monthly" class="text-[8px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.5 rounded font-black uppercase hidden">Selected</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Flat Monthly</h4>
+              <p id="planDesc-monthly" class="text-[10px] text-slate-400 leading-snug">₱1,500 monthly subscription. No system developer fee required.</p>
+            </div>
+            <div class="text-[10px] text-slate-555 border-t border-slate-850 pt-2 font-semibold flex justify-between items-center">
+              <span>Flat Rate</span>
+              <span id="planRate-monthly" class="text-white font-mono">₱1,500/mo</span>
+            </div>
+          </div>
+
+          <!-- Plan 3: Pay-per-stamp -->
+          <div onclick="selectSubscriptionPlan('per_stamp')" id="planCard-per_stamp" class="glass p-4 rounded-xl border border-slate-800 hover:border-indigo-500/50 cursor-pointer transition-all space-y-2 flex flex-col justify-between hover:bg-slate-900/10 relative">
+            <div class="space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Stamp Plan</span>
+                <span id="planBadge-per_stamp" class="text-[8px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.5 rounded font-black uppercase hidden">Selected</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Pay-Per-Stamp</h4>
+              <p id="planDesc-per_stamp" class="text-[10px] text-slate-400 leading-snug">₱3,000 System Developer Fee (One-time) + ₱1.00 per stamp issued. Pay-As-You-Go. Perfect for low transaction counts.</p>
+            </div>
+            <div class="text-[10px] text-slate-555 border-t border-slate-850 pt-2 font-semibold flex justify-between items-center">
+              <span>Stamp Rate</span>
+              <span id="planRate-per_stamp" class="text-white font-mono">₱1.00/stamp</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Plan Details -->
+      <div id="planWizardStep2" class="hidden space-y-6">
+        <div class="space-y-1">
+          <h3 class="text-xl font-black text-white flex items-center gap-2">
+            <span>📋</span> Confirm Plan Details
+          </h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Review the terms, fees, and initial dues for your selected subscription plan before proceeding to payment.
+          </p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 max-w-xl mx-auto">
+          <div class="border-b border-slate-800 pb-3">
+            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Selected Plan</span>
+            <span id="detailPlanName" class="text-lg font-black text-indigo-400">Daily active</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">System Developer Fee</span>
+              <span id="detailSystemFee" class="text-sm font-bold text-white">₱5,000.00 (One-time)</span>
+            </div>
+            <div>
+              <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Usage / Subscription Rate</span>
+              <span id="detailRate" class="text-sm font-bold text-white">₱50.00 / day active</span>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-850 pt-3">
+            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estimated Setup / Balance Due</span>
+            <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 mt-1">
+              <span id="detailEstimatedDue" class="text-2xl font-black text-emerald-400 font-mono">₱5,000.00</span>
+              <span class="text-[10px] text-slate-500 font-semibold" id="detailEstimatedDueLabel">setup fee</span>
+            </div>
+            <p id="detailEstDisclaimer" class="text-[10px] text-slate-450 mt-1.5 leading-relaxed">
+              Upon confirmation, this plan will be activated. You will need to settle this amount to keep your portal active.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex gap-3 justify-end max-w-xl mx-auto pt-2">
+          <button 
+            type="button" 
+            onclick="goToWizardStep(1)" 
+            class="bg-slate-800 hover:bg-slate-750 text-slate-350 px-6 py-2.5 rounded-xl text-xs border border-slate-700 transition-all font-semibold"
+          >
+            ← Back to Plans
+          </button>
+          <button 
+            type="button" 
+            onclick="confirmWizardPlan()" 
+            class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Payment Submission -->
+      <div id="planWizardStep3" class="hidden space-y-6">
+        <div class="space-y-1">
+          <h3 class="text-xl font-black text-white flex items-center gap-2">
+            <span>💸</span> Settle Platform Payment
+          </h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Scan the GCash QR code of the platform administrator, send the payment, and upload your receipt below to reactivate or keep your account active.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-6 items-start">
+          <!-- Left Col: QR code instructions -->
+          <div class="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 text-center space-y-3.5">
+            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Super Admin QR Code</span>
+            
+            <div class="flex justify-center">
+              <div class="w-40 h-40 bg-white rounded-xl p-2 border border-slate-800 flex items-center justify-center">
+                <img id="wizardQrImg" src="" alt="Payment QR code" class="w-full h-full object-contain">
+              </div>
+            </div>
+            
+            <p id="wizardInstructions" class="text-[11px] text-slate-350 leading-relaxed text-left bg-slate-950/40 border border-slate-850 p-3.5 rounded-xl">
+              Scan the GCash QR code below to settle your platform subscription fee.
+            </p>
+            <span class="block text-[9px] text-slate-500 font-semibold uppercase tracking-widest">GCash Settlement Account</span>
+          </div>
+
+          <!-- Right Col: Upload receipt form -->
+          <div class="md:col-span-3">
+            <!-- Highlighted Selected Plan & Amount Details -->
+            <div class="bg-indigo-950/40 border border-indigo-500/25 rounded-2xl p-4 mb-4 space-y-2 text-left relative overflow-hidden">
+              <div class="absolute top-0 right-0 w-16 h-16 bg-indigo-500/5 rounded-full blur-xl pointer-events-none"></div>
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Selected Plan</span>
+                <span id="wizardHighlightPlanBadge" class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 px-2.5 py-0.5 rounded text-[10px] font-bold font-sans">
+                  Daily active
+                </span>
+              </div>
+              <div class="flex justify-between items-baseline pt-1 border-t border-slate-800/40 mt-1">
+                <span class="text-xs text-slate-300 font-semibold">Total Amount Due</span>
+                <span id="wizardHighlightAmount" class="text-xl font-black text-emerald-400 font-mono">
+                  ₱0.00
+                </span>
+              </div>
+              <p class="text-[10px] text-slate-450 leading-normal pt-1">
+                The payment amount below has been pre-filled automatically based on your selected plan.
+              </p>
+            </div>
+
+            <form id="wizardPaymentForm" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="wizardPaymentAmount">Payment Amount (₱)</label>
+                <input 
+                  type="number" 
+                  id="wizardPaymentAmount" 
+                  placeholder="e.g. 500" 
+                  min="1"
+                  class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-white placeholder-slate-655 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-mono text-sm font-bold"
+                  required
+                >
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="wizardRefNumber">GCash Reference Number (Optional)</label>
+                <input 
+                  type="text" 
+                  id="wizardRefNumber" 
+                  placeholder="e.g. 1002 938 12728" 
+                  class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-3 text-white placeholder-slate-655 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-mono text-sm"
+                >
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Upload Payment Receipt</label>
+                <label class="block bg-slate-900 border border-slate-750 hover:border-indigo-500/30 rounded-xl px-4 py-3 text-slate-300 focus-within:ring-2 focus-within:ring-emerald-500/50 transition-all text-xs font-semibold cursor-pointer relative h-[48px] flex items-center justify-between">
+                  <span id="wizardReceiptUploadText" class="truncate text-slate-500">Choose GCash Receipt...</span>
+                  <span class="bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] shrink-0 font-bold">Upload</span>
+                  <input 
+                    type="file" 
+                    id="wizardReceiptFile" 
+                    accept="image/*" 
+                    class="hidden"
+                    required
+                  >
+                </label>
+                <p class="text-[10px] text-slate-500 mt-1.5">JPEG, PNG, or WEBP receipt screenshot. Max 2MB.</p>
+              </div>
+
+              <div class="flex gap-3 justify-end pt-2">
+                <button 
+                  type="button" 
+                  onclick="goToWizardStep(2)" 
+                  class="bg-slate-800 hover:bg-slate-750 text-slate-300 px-6 py-2.5 rounded-xl text-xs border border-slate-700 transition-all font-semibold"
+                >
+                  ← Back
+                </button>
+                <button 
+                  type="submit" 
+                  class="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+                >
+                  <span>💳</span> Send
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Welcome Aboard Modal -->
+  <div id="welcomeModal" class="fixed inset-0 z-40 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-md transition-all duration-300 p-4">
+    <div class="w-full max-w-md p-8 glass border border-indigo-500/20 rounded-3xl space-y-6 shadow-2xl relative overflow-hidden text-center bg-slate-900/95">
+      <div class="absolute -top-12 -right-12 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-12 -left-12 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="space-y-3">
+        <span class="text-5xl block animate-bounce">🚀</span>
+        <h3 class="text-2xl font-black text-white">Welcome Aboard!</h3>
+        <p class="text-xs text-indigo-400 font-bold tracking-wide uppercase">Basic Subscription Trial Activated</p>
+      </div>
+      <div class="space-y-4 text-slate-350 text-xs leading-relaxed text-left bg-slate-950/40 border border-slate-800 p-5 rounded-2xl">
+        <p>
+          We are excited to help you launch your store's digital loyalty stamps program!
+        </p>
+        <p>
+          To help you test and explore all the premium features, your portal starts with a <strong class="text-white">7-day free trial</strong> (no credit card or system developer fees required).
+        </p>
+        <p>
+          You can award points to customers, design rewards, scan codes, and simulate confirmation checks. Settle the subscription plan at any time under the <strong class="text-white">Subscription & Billing</strong> tab.
+        </p>
+      </div>
+      <div class="pt-2">
+        <button 
+          type="button" 
+          onclick="closeWelcomeModal()" 
+          class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl transition-all text-sm shadow-md flex items-center justify-center gap-2"
+        >
+          Let's Get Started!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receipt Invoice Modal -->
+  <div id="receiptModal" class="fixed inset-0 z-40 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-md transition-all duration-300 p-4">
+    <div class="w-full max-w-md p-8 glass border border-indigo-500/20 rounded-3xl space-y-6 shadow-2xl relative overflow-hidden text-left bg-slate-900/95">
+      <!-- Glow background details -->
+      <div class="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-12 -left-12 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <!-- Close Button -->
+      <button 
+        type="button" 
+        onclick="closeReceiptModal()" 
+        class="absolute top-4 right-4 text-slate-400 hover:text-white transition-all text-xl p-2 rounded-full hover:bg-white/5"
+      >
+        ✕
+      </button>
+
+      <!-- Invoice Content -->
+      <div class="space-y-6">
+        <!-- Logo & Header -->
+        <div class="text-center pb-4 border-b border-slate-805 relative">
+          <span class="text-3xl">🧾</span>
+          <h3 class="text-xl font-black text-white mt-1">Payment Receipt</h3>
+          <p class="text-[10px] text-slate-450 uppercase tracking-widest mt-0.5">PUNCH Platform Services</p>
+          
+          <!-- Diagonal PAID Watermark Badge -->
+          <div class="absolute top-4 right-8 transform rotate-12 border-4 border-emerald-500/30 text-emerald-500/30 font-black text-xl uppercase tracking-widest px-3 py-1 rounded select-none pointer-events-none">
+            PAID
+          </div>
+        </div>
+
+        <!-- Details List -->
+        <div class="space-y-3.5 text-xs">
+          <div class="flex justify-between">
+            <span class="text-slate-455">Receipt Serial:</span>
+            <span class="text-white font-mono font-bold" id="receiptSerial">RECP-1234-5678</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-455">Store Tenant:</span>
+            <span class="text-white font-semibold" id="receiptShopName">...</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-455">Date Verified:</span>
+            <span class="text-slate-300 font-mono" id="receiptDate">...</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-455">Reference ID:</span>
+            <span class="text-slate-300 font-mono font-semibold" id="receiptRef">...</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-455">Payment Method:</span>
+            <span class="text-slate-300">GCash / e-Wallet</span>
+          </div>
+          
+          <!-- Large Amount Box -->
+          <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center space-y-1 mt-4">
+            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Amount Received</span>
+            <span class="text-2xl font-black text-emerald-400 font-mono" id="receiptAmount">₱0.00</span>
+            <span class="block text-[9px] text-emerald-500 font-semibold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full w-max mx-auto mt-1">
+              ✓ Transaction Settled
+            </span>
+          </div>
+
+          <!-- Attached Receipt Image Container -->
+          <div id="receiptModalImgContainer" class="hidden border-t border-slate-800 pt-3 mt-3">
+            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Attached Receipt Image</span>
+            <div class="w-full h-44 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden">
+              <img id="receiptModalImg" src="" alt="GCash Receipt" class="w-full h-full object-contain">
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button 
+            type="button" 
+            onclick="closeReceiptModal()" 
+            class="w-full bg-slate-800 hover:bg-slate-750 text-slate-200 font-semibold py-2.5 rounded-xl text-xs border border-slate-700 transition-all text-center"
+          >
+            Close Receipt
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backdrop overlay (no background blur) -->
+  <div id="mobileMenuBackdrop" class="fixed inset-0 z-30 bg-slate-950/60 hidden transition-opacity duration-300 opacity-0"></div>
+
+  <!-- Mobile Drawer Menu (solid slate backdrop for crisp unblurred view) -->
+  <div id="mobileMenuDrawer" class="fixed inset-y-0 right-0 z-40 w-72 bg-slate-950/98 border-l border-slate-800 p-6 flex flex-col justify-between shadow-2xl transition-transform duration-300 transform translate-x-full md:hidden">
+    <div class="space-y-6">
+      <div class="flex justify-between items-center border-b border-slate-850 pb-4">
+        <h4 class="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+          <span>📋</span> Dashboard Menu
+        </h4>
+      </div>
+
+      <!-- Scroll navigation options -->
+      <div class="flex flex-col gap-2">
+        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2.5">Dashboard Sections</span>
+        <button onclick="scrollToCard('catalogCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
+          <span>🎁</span> Rewards Catalog
+        </button>
+        <button onclick="scrollToCard('scanSimCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
+          <span>📷</span> Scan Simulator
+        </button>
+        <button onclick="scrollToCard('confirmRedeemCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
+          <span>🎟️</span> Confirm Redemption
+        </button>
+        <button onclick="scrollToCard('customersCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
+          <span>👥</span> Registered Customers
+        </button>
+        <button onclick="scrollToCard('historyCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
+          <span>🏆</span> Redemptions History
+        </button>
+        <button onclick="scrollToCard('dashboardBillingCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
+          <span>💳</span> Subscription Details
+        </button>
+      </div>
+    </div>
+
+    <!-- Sign Out button section in mobile drawer -->
+    <div class="space-y-4 border-t border-slate-850 pt-4 mb-8">
+      <button onclick="signOutOwner()" class="w-full bg-rose-950/20 hover:bg-rose-950/40 text-rose-450 hover:text-rose-400 border border-rose-500/20 hover:border-rose-500/30 rounded-xl py-3 px-4 text-xs font-bold flex items-center justify-center gap-2 transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+        </svg>
+        Sign Out Dashboard
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Extract shop slug
+    const pathParts = window.location.pathname.split('/');
+    const shopSlug = pathParts[1] ? pathParts[1].toLowerCase() : '';
+
+    // Auth Elements
+    const loginOverlay = document.getElementById('loginOverlay');
+    const ownerLoginForm = document.getElementById('ownerLoginForm');
+    const loginUsernameInput = document.getElementById('loginUsername');
+    const loginPasswordInput = document.getElementById('loginPassword');
+    const loginError = document.getElementById('loginError');
+
+    // Elements
+    const dashboardLoader = document.getElementById('dashboardLoader');
+    const errorState = document.getElementById('errorState');
+    const dashboardContent = document.getElementById('dashboardContent');
+
+    const shopTitleSlug = document.getElementById('shopTitleSlug');
+    const shopDisplayName = document.getElementById('shopDisplayName');
+    const shopDisplayRule = document.getElementById('shopDisplayRule');
+    
+    const notificationBtn = document.getElementById('notificationBtn');
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    const notificationList = document.getElementById('notificationList');
+    const notificationBadge = document.getElementById('notificationBadge');
+    const alertCountText = document.getElementById('alertCountText');
+    const signOutBtn = document.getElementById('signOutBtn');
+    
+    const scanSimForm = document.getElementById('scanSimForm');
+    const scanPhoneInput = document.getElementById('scanPhoneInput');
+    
+    const specialsForm = document.getElementById('specialsForm');
+    const specialsTextarea = document.getElementById('specialsTextarea');
+    
+    const customerCountBadge = document.getElementById('customerCountBadge');
+    const customersTableBody = document.getElementById('customersTableBody');
+    const tableEmptyState = document.getElementById('tableEmptyState');
+    const shareLinkField = document.getElementById('shareLinkField');
+
+    // Rewards Catalog Elements
+    const addRewardForm = document.getElementById('addRewardForm');
+    const rewardPointsInput = document.getElementById('rewardPointsInput');
+    const rewardTextInput = document.getElementById('rewardTextInput');
+    const rewardListContainer = document.getElementById('rewardListContainer');
+
+    let shop = null;
+    let customersList = [];
+    let editingRewardId = null;
+    let isTrialExpired = false;
+    let isTrialActive = false;
+    let tempSelectedPlan = null;
+    let wizardReceiptBase64 = null;
+    let activePricing = null;
+    let paymentQrUrl = null;
+    let paymentInstructionsText = null;
+
+    // fetch helper with auth headers
+    function fetchWithAuth(url, options = {}) {
+      if (!options.headers) {
+        options.headers = {};
+      }
+      
+      const username = sessionStorage.getItem('owner_username');
+      const password = sessionStorage.getItem('owner_password');
+      
+      options.headers['x-owner-username'] = username;
+      options.headers['x-owner-password'] = password;
+      
+      return fetch(url, options).then(response => {
+        if (response.status === 401) {
+          sessionStorage.removeItem('owner_username');
+          sessionStorage.removeItem('owner_password');
+          loginOverlay.classList.remove('hidden');
+          dashboardLoader.classList.add('hidden');
+          dashboardContent.classList.add('hidden');
+          throw new Error('Session expired or unauthorized. Please log in.');
+        }
+        return response;
+      });
+    }
+
+    function renderBillingDetails(billingSummary) {
+      if (!billingSummary) return;
+      
+      const planName = billingSummary.methodLabel;
+      const breakdown = billingSummary.breakdown;
+      const totalDues = billingSummary.accumulatedFee;
+      const totalPaid = billingSummary.totalPaid;
+      const balance = billingSummary.outstandingBalance;
+      const method = billingSummary.method;
+      const daysActive = billingSummary.daysActive || 1;
+      
+      const suspendedBillingDetails = document.getElementById('suspendedBillingDetails');
+      if (suspendedBillingDetails) {
+        suspendedBillingDetails.innerHTML = `
+          <div class="space-y-2 text-left text-xs bg-slate-900 border border-slate-850 rounded-2xl p-4">
+            <div class="flex justify-between border-b border-slate-800 pb-1.5 mb-1.5 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+              <span>Statement Breakdown</span>
+              <span>₱ PHP</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Subscription Plan:</span>
+              <span class="text-indigo-400 font-bold font-mono text-right">${planName}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Usage Details:</span>
+              <span class="text-slate-300 font-mono text-right text-[11px] leading-tight max-w-[200px] break-words">${breakdown}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Total Dues:</span>
+              <span class="text-white font-bold font-mono">₱${totalDues.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Total Payments:</span>
+              <span class="text-emerald-400 font-bold font-mono">₱${totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            </div>
+            <div class="flex justify-between border-t border-slate-805 pt-2 mt-2 text-xs">
+              <span class="text-slate-300 font-bold">Outstanding Balance:</span>
+              <span class="text-rose-450 font-black font-mono">₱${balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            </div>
+          </div>
+        `;
+      }
+      
+      const activeBillingDetails = document.getElementById('activeBillingDetails');
+      if (activeBillingDetails) {
+        activeBillingDetails.innerHTML = `
+          <div class="space-y-2 text-left text-xs font-sans">
+            <div>
+              <span class="block text-[10px] font-bold text-slate-500 uppercase">Active Plan</span>
+              <span class="text-indigo-400 font-bold font-mono">${planName}</span>
+            </div>
+            <div>
+              <span class="block text-[10px] font-bold text-slate-500 uppercase">Usage details</span>
+              <span class="text-slate-355 font-mono text-[11px] leading-tight block mt-0.5">${breakdown}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <span class="block text-[10px] font-bold text-slate-500 uppercase">Dues</span>
+                <span class="text-white font-bold font-mono">₱${totalDues.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              </div>
+              <div>
+                <span class="block text-[10px] font-bold text-slate-500 uppercase">Paid</span>
+                <span class="text-emerald-400 font-bold font-mono">₱${totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              </div>
+            </div>
+            <div class="border-t border-slate-850 pt-2 mt-1 flex justify-between items-center">
+              <span class="text-[10px] font-bold text-slate-400 uppercase">Outstanding Balance</span>
+              <span class="text-rose-450 font-black font-mono text-sm">₱${balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      // Check for trial vs paid plans layouts toggling
+      const hasPayments = shop && shop.payments && shop.payments.length > 0;
+      const subscribeRevealed = sessionStorage.getItem(`subscribe_revealed_${shopSlug}`) === 'true';
+      const showOptions = subscribeRevealed || hasPayments;
+
+      // Update active selection highlighting on plans cards
+      const selectedPlan = billingSummary.selectedPlan || 'onetime_daily';
+      ['onetime_daily', 'monthly', 'per_stamp'].forEach(m => {
+        const card = document.getElementById(`planCard-${m}`);
+        const badge = document.getElementById(`planBadge-${m}`);
+        if (card) {
+          if (m === selectedPlan) {
+            card.classList.add('border-indigo-500', 'glow-indigo', 'bg-indigo-950/25');
+            card.classList.remove('border-slate-800');
+          } else {
+            card.classList.remove('border-indigo-500', 'glow-indigo', 'bg-indigo-950/25');
+            card.classList.add('border-slate-800');
+          }
+        }
+        if (badge) {
+          if (m === selectedPlan) {
+            badge.classList.remove('hidden');
+          } else {
+            badge.classList.add('hidden');
+          }
+        }
+      });
+
+      if (showOptions) {
+        document.getElementById('dashboardBillingCard').classList.remove('hidden');
+      } else {
+        document.getElementById('dashboardBillingCard').classList.add('hidden');
+      }
+
+      if (method === 'trial') {
+        const remainingDays = Math.max(0, 7 - (daysActive - 1));
+        document.getElementById('trialDaysLeftText').textContent = `${remainingDays}/7 days`;
+        document.getElementById('trialProgressBar').style.width = `${Math.round((remainingDays / 7) * 100)}%`;
+        
+        document.getElementById('trialStatusCard').classList.remove('hidden');
+        
+        // Ensure trial card texts are active trial state
+        const upgradeBtn = document.querySelector('#trialStatusCard button');
+        if (upgradeBtn) {
+          upgradeBtn.innerHTML = `🚀 Upgrade to Premium Plan`;
+        }
+        document.querySelector('#trialStatusCard h3').innerHTML = `<span>🎁</span> Free Trial Active`;
+        document.querySelector('#trialStatusCard p').textContent = `Your store loyalty portal is currently on the 7-day free trial. You have full access to all features to test the system before starting a paid subscription.`;
+      } else {
+        // Trial has expired
+        document.getElementById('trialDaysLeftText').textContent = `0/7 days`;
+        document.getElementById('trialProgressBar').style.width = `0%`;
+        document.getElementById('trialStatusCard').classList.remove('hidden');
+        
+        // Change title and button text on the trial card to indicate expired state
+        document.querySelector('#trialStatusCard h3').innerHTML = `<span>⚠️</span> Free Trial Expired`;
+        document.querySelector('#trialStatusCard p').textContent = `Your 7-day free trial has expired. To reactivate cashier scanning and customer points features, please choose a subscription plan and settle the balance.`;
+        const upgradeBtn = document.querySelector('#trialStatusCard button');
+        if (upgradeBtn) {
+          upgradeBtn.innerHTML = `🚀 Subscribe to Premium Plan`;
+        }
+      }
+    }
+
+    function updatePlanCardsPricing(pricing) {
+      if (!pricing) return;
+      const dailyDevFee = pricing.systemDeveloperFee !== undefined ? pricing.systemDeveloperFee : (pricing.onetimeSetupFee !== undefined ? pricing.onetimeSetupFee : 5000);
+      const dailyFee = pricing.dailyFee !== undefined ? pricing.dailyFee : 50;
+      const monthlyFee = pricing.monthlyFee !== undefined ? pricing.monthlyFee : 1500;
+      const perStampFee = pricing.perStampFee !== undefined ? pricing.perStampFee : 1.0;
+      const perStampDevFee = pricing.perStampDeveloperFee !== undefined ? pricing.perStampDeveloperFee : 3000;
+
+      // Update Daily Plan card
+      const planDescDaily = document.getElementById('planDesc-onetime_daily');
+      const planRateDaily = document.getElementById('planRate-onetime_daily');
+      if (planDescDaily) {
+        planDescDaily.textContent = `₱${dailyDevFee.toLocaleString()} System Developer Fee (One-time) + ₱${dailyFee}/day active. Best for standard stores.`;
+      }
+      if (planRateDaily) {
+        planRateDaily.textContent = `₱${dailyFee}/day`;
+      }
+
+      // Update Monthly Plan card
+      const planDescMonthly = document.getElementById('planDesc-monthly');
+      const planRateMonthly = document.getElementById('planRate-monthly');
+      if (planDescMonthly) {
+        planDescMonthly.textContent = `₱${monthlyFee.toLocaleString()} monthly subscription. No system developer fee required.`;
+      }
+      if (planRateMonthly) {
+        planRateMonthly.textContent = `₱${monthlyFee.toLocaleString()}/mo`;
+      }
+
+      // Update Stamp Plan card
+      const planDescStamp = document.getElementById('planDesc-per_stamp');
+      const planRateStamp = document.getElementById('planRate-per_stamp');
+      if (planDescStamp) {
+        planDescStamp.textContent = `₱${perStampDevFee.toLocaleString()} System Developer Fee (One-time) + ₱${perStampFee.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 2})} per stamp issued. Pay-As-You-Go. Perfect for low transaction counts.`;
+      }
+      if (planRateStamp) {
+        planRateStamp.textContent = `₱${perStampFee.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 2})}/stamp`;
+      }
+    }
+
+    async function init() {
+      if (!shopSlug) {
+        showLoaderState(errorState);
+        return;
+      }
+      
+      shopTitleSlug.textContent = `/${shopSlug}`;
+      
+      const origin = window.location.origin;
+      shareLinkField.value = `${origin}/${shopSlug}`;
+
+      try {
+        // Fetch Shop Data first
+        const response = await fetch(`/api/shops/${shopSlug}`);
+        if (!response.ok) throw new Error('Shop not found');
+        shop = await response.json();
+
+        // Brand login overlay & header & preview logos
+        if (shop.name) {
+          document.getElementById('loginShopName').textContent = `${shop.name} Owner Sign In`;
+        }
+        if (shop.logo) {
+          const loginShopLogo = document.getElementById('loginShopLogo');
+          const loginShopEmoji = document.getElementById('loginShopEmoji');
+          if (loginShopLogo) {
+            loginShopLogo.src = shop.logo;
+            loginShopLogo.classList.remove('hidden');
+          }
+          if (loginShopEmoji) {
+            loginShopEmoji.classList.add('hidden');
+          }
+
+          const headerLogoImg = document.getElementById('headerLogoImg');
+          const headerEmojiFallback = document.getElementById('headerEmojiFallback');
+          if (headerLogoImg) {
+            headerLogoImg.src = shop.logo;
+            headerLogoImg.classList.remove('hidden');
+          }
+          if (headerEmojiFallback) {
+            headerEmojiFallback.classList.add('hidden');
+          }
+
+          const logoPreviewImg = document.getElementById('logoPreviewImg');
+          const logoEmojiFallback = document.getElementById('logoEmojiFallback');
+          if (logoPreviewImg) {
+            logoPreviewImg.src = shop.logo;
+            logoPreviewImg.classList.remove('hidden');
+          }
+          if (logoEmojiFallback) {
+            logoEmojiFallback.classList.add('hidden');
+          }
+        } else {
+          const loginShopLogo = document.getElementById('loginShopLogo');
+          const loginShopEmoji = document.getElementById('loginShopEmoji');
+          if (loginShopLogo) loginShopLogo.classList.add('hidden');
+          if (loginShopEmoji) loginShopEmoji.classList.remove('hidden');
+
+          const headerLogoImg = document.getElementById('headerLogoImg');
+          const headerEmojiFallback = document.getElementById('headerEmojiFallback');
+          if (headerLogoImg) headerLogoImg.classList.add('hidden');
+          if (headerEmojiFallback) headerEmojiFallback.classList.remove('hidden');
+
+          const logoPreviewImg = document.getElementById('logoPreviewImg');
+          const logoEmojiFallback = document.getElementById('logoEmojiFallback');
+          if (logoPreviewImg) logoPreviewImg.classList.add('hidden');
+          if (logoEmojiFallback) logoEmojiFallback.classList.remove('hidden');
+        }
+
+        // Auth gate check
+        if (!sessionStorage.getItem('owner_username') || !sessionStorage.getItem('owner_password')) {
+          loginOverlay.classList.remove('hidden');
+          dashboardLoader.classList.add('hidden');
+          return;
+        }
+
+        // Fetch Subscription and Billing details
+        await loadBillingAndPayments();
+        
+        isTrialExpired = false;
+        isTrialActive = false;
+        const billingRes = await fetchWithAuth(`/api/shops/${shopSlug}/billing`);
+        if (billingRes.ok) {
+          const billingData = await billingRes.json();
+          if (billingData.billingSummary) {
+            isTrialActive = billingData.billingSummary.method === 'trial';
+            isTrialExpired = billingData.billingSummary.daysActive > 7 && billingData.billingSummary.outstandingBalance > 0;
+          }
+          if (billingData.paymentQr) {
+            document.getElementById('suspendedQrImg').src = billingData.paymentQr;
+            document.getElementById('dashboardBillingQrImg').src = billingData.paymentQr;
+            document.getElementById('suspendedInstructions').textContent = billingData.paymentInstructions;
+            document.getElementById('dashboardBillingInstructions').textContent = billingData.paymentInstructions;
+            document.getElementById('suspendedBillingContainer').classList.remove('hidden');
+            document.getElementById('dashboardBillingCard').classList.remove('hidden');
+          }
+        }
+
+        // Pop welcome aboard modal if trial is active and not yet dismissed
+        const welcomeDismissed = localStorage.getItem(`welcome_dismissed_${shopSlug}`);
+        if (isTrialActive && !welcomeDismissed) {
+          document.getElementById('welcomeModal').classList.remove('hidden');
+        }
+
+        // Check suspension status
+        const trialExpiredBanner = document.getElementById('trialExpiredBanner');
+        if (shop.isSuspended) {
+          if (isTrialExpired) {
+            // Bypass full screen suspend overlay, instead show banner and lock tabs
+            document.getElementById('suspendedOverlay').classList.add('hidden');
+            if (trialExpiredBanner) {
+              trialExpiredBanner.classList.remove('hidden');
+            }
+            
+            // Disable tab buttons console and catalog
+            const consoleTab = document.getElementById('tabBtn-console');
+            const catalogTab = document.getElementById('tabBtn-catalog');
+            if (consoleTab) {
+              consoleTab.classList.add('opacity-45', 'cursor-not-allowed');
+              consoleTab.setAttribute('title', 'Disabled - Trial Expired');
+            }
+            if (catalogTab) {
+              catalogTab.classList.add('opacity-45', 'cursor-not-allowed');
+              catalogTab.setAttribute('title', 'Disabled - Trial Expired');
+            }
+            
+            // Redirect to subscription tab
+            switchTab('subscription');
+          } else {
+            const suspensionReason = document.getElementById('suspensionReason');
+            if (suspensionReason) {
+              suspensionReason.textContent = 'This store loyalty portal has been suspended by the platform administrator.';
+            }
+            document.getElementById('suspendedOverlay').classList.remove('hidden');
+            dashboardLoader.classList.add('hidden');
+            dashboardContent.classList.add('hidden');
+            return;
+          }
+        } else {
+          document.getElementById('suspendedOverlay').classList.add('hidden');
+          if (trialExpiredBanner) {
+            trialExpiredBanner.classList.add('hidden');
+          }
+          // Enable tab buttons Console and Catalog
+          const consoleTab = document.getElementById('tabBtn-console');
+          const catalogTab = document.getElementById('tabBtn-catalog');
+          if (consoleTab) {
+            consoleTab.classList.remove('opacity-45', 'cursor-not-allowed');
+            consoleTab.removeAttribute('title');
+          }
+          if (catalogTab) {
+            catalogTab.classList.remove('opacity-45', 'cursor-not-allowed');
+            catalogTab.removeAttribute('title');
+          }
+        }
+        
+        // Populate display fields
+        shopDisplayName.textContent = shop.name;
+        shopDisplayRule.textContent = shop.rule;
+        specialsTextarea.value = shop.specials ? shop.specials.join('\n') : '';
+
+        // Render catalog
+        renderRewardsCatalog();
+
+        // Load customers and show dashboard
+        await loadCustomers();
+        await loadRedemptions();
+        showLoaderState(dashboardContent);
+      } catch (err) {
+        console.error(err);
+        showLoaderState(errorState);
+      }
+    }
+
+    function showLoaderState(visibleElement) {
+      dashboardLoader.classList.add('hidden');
+      errorState.classList.add('hidden');
+      dashboardContent.classList.add('hidden');
+      
+      visibleElement.classList.remove('hidden');
+    }
+
+    // Load registered customers list
+    async function loadCustomers() {
+      try {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/customers`);
+        if (!response.ok) throw new Error('Could not fetch customers');
+        customersList = await response.json();
+        
+        customerCountBadge.textContent = `${customersList.length} Customer${customersList.length === 1 ? '' : 's'}`;
+        renderCustomersTable();
+        updateNotifications();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Render registered customers table
+    function renderCustomersTable() {
+      customersTableBody.innerHTML = '';
+      
+      if (customersList.length === 0) {
+        tableEmptyState.classList.remove('hidden');
+        return;
+      }
+      tableEmptyState.classList.add('hidden');
+
+      customersList.forEach(cust => {
+        const row = document.createElement('tr');
+        row.className = 'border-b border-slate-900/60 hover:bg-slate-900/20 transition-all';
+        
+        const dateFormatted = new Date(cust.createdAt).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        row.innerHTML = `
+          <td class="py-3.5 px-4 font-medium">
+            <div class="text-white font-bold text-sm">${cust.name || 'Anonymous'}</div>
+            <div class="text-xs text-slate-500 font-mono tracking-wider">${cust.phone}</div>
+          </td>
+          <td class="py-3.5 px-4 text-slate-400 font-mono">${dateFormatted}</td>
+          <td class="py-3.5 px-4 text-center">
+            <span class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 px-2.5 py-1 rounded-full text-xs font-bold font-mono">
+              ${cust.points} Stamps
+            </span>
+            ${cust.pendingRedeem ? `<span class="block text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold mt-1.5 animate-pulse">PENDING: ${cust.pendingRedeem.code}</span>` : ''}
+          </td>
+          <td class="py-3.5 px-4 text-right">
+            <button 
+              onclick="addPointDirect('${cust.id}')"
+              class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-1.5 px-3.5 rounded-lg shadow-sm transition-all"
+            >
+              +1 Stamp
+            </button>
+          </td>
+        `;
+        customersTableBody.appendChild(row);
+      });
+    }
+
+    // Action: Directly add stamp from table
+    async function addPointDirect(customerId) {
+      try {
+        const response = await fetchWithAuth(`/api/customers/${customerId}/add-point`, {
+          method: 'POST'
+        });
+        
+        if (!response.ok) throw new Error('Failed to add stamp');
+        
+        // Reload list
+        await loadCustomers();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Action: Manual scanner simulation form
+    scanSimForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const phone = scanPhoneInput.value.trim();
+      if (!phone) return;
+
+      try {
+        // Authenticate check (phone check first)
+        const checkResponse = await fetch(`/api/shops/${shopSlug}/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        
+        const checkResult = await checkResponse.json();
+        if (!checkResponse.ok) throw new Error(checkResult.error || 'Failed to check customer.');
+
+        let customer = null;
+
+        if (checkResult.isNew) {
+          // Auto-register new walk-in customer with placeholder name
+          const registerResponse = await fetch(`/api/shops/${shopSlug}/auth`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, name: 'Walk-in Customer' })
+          });
+          const registerResult = await registerResponse.json();
+          if (!registerResponse.ok) throw new Error(registerResult.error || 'Failed to auto-register customer.');
+          customer = registerResult.customer;
+        } else {
+          customer = checkResult.customer;
+        }
+
+        // Increment point
+        const pointResponse = await fetchWithAuth(`/api/customers/${customer.id}/add-point`, {
+          method: 'POST'
+        });
+        
+        if (!pointResponse.ok) throw new Error('Failed to award point');
+
+        scanPhoneInput.value = '';
+        alert(`Successfully added 1 stamp to customer ${customer.name || phone}!`);
+        await loadCustomers();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    // Action: Specials form submission
+    specialsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const specialsText = specialsTextarea.value;
+      const specialsArray = specialsText.split('\n').map(s => s.trim()).filter(Boolean);
+
+      try {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/specials`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ specials: specialsArray })
+        });
+
+        if (!response.ok) throw new Error('Failed to update specials');
+        alert('Specials updated successfully!');
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    // Logo Upload Logic
+    const logoFileInput = document.getElementById('logoFileInput');
+    const logoPreviewImg = document.getElementById('logoPreviewImg');
+    const logoEmojiFallback = document.getElementById('logoEmojiFallback');
+
+    logoFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        alert('File size exceeds 2MB limit.');
+        logoFileInput.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result;
+        
+        try {
+          const response = await fetchWithAuth(`/api/shops/${shopSlug}/logo`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ logo: base64Data })
+          });
+
+          if (!response.ok) throw new Error('Failed to upload logo.');
+          
+          logoPreviewImg.src = base64Data;
+          logoPreviewImg.classList.remove('hidden');
+          logoEmojiFallback.classList.add('hidden');
+
+          const headerLogoImg = document.getElementById('headerLogoImg');
+          const headerEmojiFallback = document.getElementById('headerEmojiFallback');
+          if (headerLogoImg) {
+            headerLogoImg.src = base64Data;
+            headerLogoImg.classList.remove('hidden');
+          }
+          if (headerEmojiFallback) {
+            headerEmojiFallback.classList.add('hidden');
+          }
+
+          const loginShopLogo = document.getElementById('loginShopLogo');
+          const loginShopEmoji = document.getElementById('loginShopEmoji');
+          if (loginShopLogo) {
+            loginShopLogo.src = base64Data;
+            loginShopLogo.classList.remove('hidden');
+          }
+          if (loginShopEmoji) {
+            loginShopEmoji.classList.add('hidden');
+          }
+
+          alert('Store logo updated successfully!');
+        } catch (err) {
+          alert(err.message);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Redeem Code Submission Logic
+    const redeemForm = document.getElementById('redeemForm');
+    const redeemCodeInput = document.getElementById('redeemCodeInput');
+
+    redeemForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = redeemCodeInput.value.trim();
+      if (!code || code.length !== 4) {
+        alert('Please enter a valid 4-digit code.');
+        return;
+      }
+
+      try {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/redeem/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to verify redemption.');
+        }
+
+        redeemCodeInput.value = '';
+        alert(`Success! Redeemed reward for customer ${data.name || 'Anonymous'} (${data.phone}).`);
+        
+        // Refresh data
+        await loadCustomers();
+        await loadRedemptions();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    // Load Redemptions History
+    async function loadRedemptions() {
+      try {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/redemptions`);
+        if (!response.ok) throw new Error('Failed to load claim history.');
+        const history = await response.json();
+
+        const redemptionsTableBody = document.getElementById('redemptionsTableBody');
+        const redemptionsEmptyState = document.getElementById('redemptionsEmptyState');
+        redemptionsTableBody.innerHTML = '';
+
+        if (history.length === 0) {
+          redemptionsEmptyState.classList.remove('hidden');
+          return;
+        }
+        redemptionsEmptyState.classList.add('hidden');
+
+        history.forEach(r => {
+          const date = new Date(r.redeemedAt).toLocaleDateString(undefined, {
+            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+          const row = document.createElement('tr');
+          row.className = 'border-b border-slate-900/40 hover:bg-slate-900/10 transition-all';
+          row.innerHTML = `
+            <td class="py-3 px-3 font-medium">
+              <div class="text-slate-300 font-bold">${r.customerName}</div>
+              <div class="text-[10px] text-slate-500 font-mono">${r.customerPhone}</div>
+            </td>
+            <td class="py-3 px-3 text-slate-500 font-mono">${date}</td>
+            <td class="py-3 px-3 text-center text-emerald-500 font-bold font-mono">${r.pointsRedeemed} Stamps</td>
+            <td class="py-3 px-3 text-right font-mono font-bold text-amber-400 tracking-wider">${r.code}</td>
+          `;
+          redemptionsTableBody.appendChild(row);
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // --- REWARDS CATALOG FUNCTIONS ---
+
+    function renderRewardsCatalog() {
+      rewardListContainer.innerHTML = '';
+      
+      // Update rules text dynamically
+      if (shopDisplayRule) {
+        shopDisplayRule.textContent = shop.rule;
+      }
+
+      if (!shop.rewards || shop.rewards.length === 0) {
+        rewardListContainer.innerHTML = `
+          <div class="text-center py-4 text-slate-500 text-xs">
+            No reward tiers configured yet.
+          </div>
+        `;
+        return;
+      }
+
+      shop.rewards.forEach(reward => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-slate-800 text-xs gap-3 hover:border-slate-700/50 transition-all';
+        
+        const isActive = reward.isActive;
+        
+        if (reward.id === editingRewardId) {
+          div.innerHTML = `
+            <div class="flex-grow flex gap-2 items-center">
+              <input 
+                type="number" 
+                id="editStamps-${reward.id}" 
+                value="${reward.pointsRequired}" 
+                min="1"
+                class="w-16 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs font-semibold text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+              <input 
+                type="text" 
+                id="editText-${reward.id}" 
+                value="${escapeHtml(reward.rewardText)}" 
+                class="flex-grow bg-slate-955 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button onclick="saveRewardEdit('${reward.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition-all">Save</button>
+              <button onclick="cancelRewardEdit()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded text-[10px] font-semibold transition-all">Cancel</button>
+            </div>
+          `;
+        } else {
+          div.innerHTML = `
+            <div class="space-y-0.5 flex-grow">
+              <div class="text-white font-bold flex items-center gap-1.5">
+                <span>🎟️</span>
+                <span>${reward.pointsRequired} Stamps</span>
+              </div>
+              <div class="text-slate-400 font-medium">${escapeHtml(reward.rewardText)}</div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button onclick="startRewardEdit('${reward.id}')" class="text-indigo-400 hover:text-indigo-300 p-1 rounded transition-all" title="Edit Option">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                </svg>
+              </button>
+              ${isActive ? 
+                `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold">Active</span>` : 
+                `<button onclick="activateReward('${reward.id}')" class="bg-indigo-600/15 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded text-[10px] font-semibold transition-all">Activate</button>
+                 <button onclick="deleteReward('${reward.id}')" class="text-rose-500 hover:text-rose-400 p-1 rounded transition-all" title="Delete Option">
+                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                   </svg>
+                 </button>`
+              }
+            </div>
+          `;
+        }
+        rewardListContainer.appendChild(div);
+      });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    function startRewardEdit(rewardId) {
+      editingRewardId = rewardId;
+      renderRewardsCatalog();
+    }
+
+    function cancelRewardEdit() {
+      editingRewardId = null;
+      renderRewardsCatalog();
+    }
+
+    async function saveRewardEdit(rewardId) {
+      const editStamps = document.getElementById(`editStamps-${rewardId}`);
+      const editText = document.getElementById(`editText-${rewardId}`);
+      if (!editStamps || !editText) return;
+
+      const pointsRequired = parseInt(editStamps.value);
+      const rewardText = editText.value.trim();
+
+      if (!pointsRequired || !rewardText) {
+        alert('Stamps count and reward description are required.');
+        return;
+      }
+
+      try {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/rewards/${rewardId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pointsRequired, rewardText })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to edit reward option.');
+
+        shop = data;
+        editingRewardId = null;
+        renderRewardsCatalog();
+        alert('Reward option updated successfully!');
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Add reward submit
+    addRewardForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pointsRequired = parseInt(rewardPointsInput.value);
+      const rewardText = rewardTextInput.value.trim();
+
+      if (!pointsRequired || !rewardText) return;
+
+      try {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/rewards`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pointsRequired, rewardText })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to add reward option.');
+
+        shop = data;
+        rewardPointsInput.value = '';
+        rewardTextInput.value = '';
+        renderRewardsCatalog();
+        alert('New reward option added successfully!');
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    // Activate reward function
+    async function activateReward(rewardId) {
+      try {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/rewards/${rewardId}/activate`, {
+          method: 'POST'
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to activate reward.');
+
+        shop = data;
+        renderRewardsCatalog();
+        alert('Reward rule activated successfully!');
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Delete reward function
+    async function deleteReward(rewardId) {
+      if (!confirm('Are you sure you want to delete this reward option?')) return;
+      try {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/rewards/${rewardId}`, {
+          method: 'DELETE'
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to delete reward.');
+
+        shop = data;
+        renderRewardsCatalog();
+        alert('Reward option deleted.');
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Owner Login Form submission handler
+    ownerLoginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = loginUsernameInput.value.trim();
+      const password = loginPasswordInput.value.trim();
+      
+      try {
+        const response = await fetch(`/api/shops/${shopSlug}/owner/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Login failed.');
+        
+        sessionStorage.setItem('owner_username', username);
+        sessionStorage.setItem('owner_password', password);
+        
+        loginOverlay.classList.add('hidden');
+        loginError.classList.add('hidden');
+        
+        await init();
+      } catch (err) {
+        loginError.textContent = err.message;
+        loginError.classList.remove('hidden');
+      }
+    });
+
+    const ownerPaymentsTableBody = document.getElementById('ownerPaymentsTableBody');
+    const ownerPaymentsEmptyState = document.getElementById('ownerPaymentsEmptyState');
+
+    async function loadBillingAndPayments() {
+      try {
+        const shopRes = await fetch(`/api/shops/${shopSlug}`);
+        if (!shopRes.ok) throw new Error('Failed to load shop details.');
+        const shopData = await shopRes.json();
+        
+        // Sync local shop variable
+        shop = shopData;
+        
+        const billingRes = await fetchWithAuth(`/api/shops/${shopSlug}/billing`);
+        if (billingRes.ok) {
+          const billingData = await billingRes.json();
+          if (billingData.billingSummary) {
+            isTrialActive = billingData.billingSummary.method === 'trial';
+            isTrialExpired = billingData.billingSummary.daysActive > 7 && billingData.billingSummary.outstandingBalance > 0;
+          }
+          renderBillingDetails(billingData.billingSummary);
+          if (billingData.pricing) {
+            activePricing = billingData.pricing; // Global sync
+            updatePlanCardsPricing(billingData.pricing);
+          }
+          if (billingData.paymentQr) {
+            paymentQrUrl = billingData.paymentQr; // Global sync
+            paymentInstructionsText = billingData.paymentInstructions; // Global sync
+          }
+        }
+
+        // Check suspension changes dynamically
+        const trialExpiredBanner = document.getElementById('trialExpiredBanner');
+        if (shop.isSuspended) {
+          if (isTrialExpired) {
+            document.getElementById('suspendedOverlay').classList.add('hidden');
+            if (trialExpiredBanner) {
+              trialExpiredBanner.classList.remove('hidden');
+            }
+            const consoleTab = document.getElementById('tabBtn-console');
+            const catalogTab = document.getElementById('tabBtn-catalog');
+            if (consoleTab) {
+              consoleTab.classList.add('opacity-45', 'cursor-not-allowed');
+              consoleTab.setAttribute('title', 'Disabled - Trial Expired');
+            }
+            if (catalogTab) {
+              catalogTab.classList.add('opacity-45', 'cursor-not-allowed');
+              catalogTab.setAttribute('title', 'Disabled - Trial Expired');
+            }
+          }
+        } else {
+          document.getElementById('suspendedOverlay').classList.add('hidden');
+          if (trialExpiredBanner) {
+            trialExpiredBanner.classList.add('hidden');
+          }
+          const consoleTab = document.getElementById('tabBtn-console');
+          const catalogTab = document.getElementById('tabBtn-catalog');
+          if (consoleTab) {
+            consoleTab.classList.remove('opacity-45', 'cursor-not-allowed');
+            consoleTab.removeAttribute('title');
+          }
+          if (catalogTab) {
+            catalogTab.classList.remove('opacity-45', 'cursor-not-allowed');
+            catalogTab.removeAttribute('title');
+          }
+        }
+
+        renderPaymentsHistory(shop.payments || []);
+      } catch (err) {
+        console.error('Error loading billing and payments history:', err);
+      }
+    }
+
+    function renderPaymentsHistory(payments) {
+      if (!ownerPaymentsTableBody) return;
+      ownerPaymentsTableBody.innerHTML = '';
+      
+      const sortedPayments = [...payments].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      
+      if (sortedPayments.length === 0) {
+        ownerPaymentsEmptyState.classList.remove('hidden');
+        return;
+      }
+      ownerPaymentsEmptyState.classList.add('hidden');
+
+      sortedPayments.forEach(p => {
+        const row = document.createElement('tr');
+        row.className = 'border-b border-slate-900/40 hover:bg-slate-900/10 transition-all';
+        
+        const date = new Date(p.timestamp).toLocaleDateString(undefined, {
+          month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+        
+        const statusText = p.status === 'confirmed' ? 'Confirmed' : 'Pending';
+        const statusBadgeColor = p.status === 'confirmed'
+          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse';
+        
+        let receiptAction = '';
+        if (p.status === 'confirmed') {
+          receiptAction = `
+            <button 
+              onclick="viewReceipt('${p.id}', ${p.amount}, '${p.referenceNumber}', '${p.verifiedAt}')"
+              class="bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded text-[10px] font-bold transition-all shadow-sm"
+            >
+              View Receipt
+            </button>
+          `;
+        } else {
+          receiptAction = `<span class="text-slate-500 text-[10px] font-medium font-mono">Unverified</span>`;
+        }
+        
+        row.innerHTML = `
+          <td class="py-3 px-3 font-mono text-slate-400">${date}</td>
+          <td class="py-3 px-3 font-mono text-slate-350 select-all" title="Reference Code">${escapeHtml(p.referenceNumber)}</td>
+          <td class="py-3 px-3 text-right text-emerald-400 font-bold font-mono">₱${p.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+          <td class="py-3 px-3 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${statusBadgeColor}">${statusText}</span>
+          </td>
+          <td class="py-3 px-3 text-right">
+            ${receiptAction}
+          </td>
+        `;
+        ownerPaymentsTableBody.appendChild(row);
+      });
+    }
+
+    function viewReceipt(receiptId, amount, refNum, verifiedAt) {
+      document.getElementById('receiptSerial').textContent = receiptId;
+      document.getElementById('receiptShopName').textContent = shop ? shop.name : shopSlug;
+      
+      const dateStr = verifiedAt && verifiedAt !== 'null'
+        ? new Date(verifiedAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : 'N/A';
+      document.getElementById('receiptDate').textContent = dateStr;
+      document.getElementById('receiptRef').textContent = refNum;
+      document.getElementById('receiptAmount').textContent = `₱${amount.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+      
+      document.getElementById('receiptModal').classList.remove('hidden');
+    }
+
+    function closeReceiptModal() {
+      document.getElementById('receiptModal').classList.add('hidden');
+    }
+
+    // Expose functions to window for inline HTML call
+    window.activateReward = activateReward;
+    window.deleteReward = deleteReward;
+    window.startRewardEdit = startRewardEdit;
+    window.cancelRewardEdit = cancelRewardEdit;
+    window.saveRewardEdit = saveRewardEdit;
+    window.viewReceipt = viewReceipt;
+    window.closeReceiptModal = closeReceiptModal;
+
+    // --- NOTIFICATION & SIGN OUT FUNCTIONS ---
+
+    function updateNotifications() {
+      if (!shop || !customersList) return;
+      
+      const maxPoints = parseInt(shop.rule.match(/\d+/)?.[0]) || 10;
+      const notifyingCustomers = customersList.filter(cust => cust.points >= maxPoints);
+      
+      if (notifyingCustomers.length > 0) {
+        notificationBadge.textContent = notifyingCustomers.length;
+        notificationBadge.classList.remove('hidden');
+        alertCountText.textContent = `${notifyingCustomers.length} Active`;
+      } else {
+        notificationBadge.classList.add('hidden');
+        alertCountText.textContent = `0 Active`;
+      }
+      
+      notificationList.innerHTML = '';
+      if (notifyingCustomers.length === 0) {
+        notificationList.innerHTML = `
+          <div class="text-center py-4 text-[11px] text-slate-500 leading-normal">
+            No active alerts.<br>Customers will appear here when they reach the stamp limit.
+          </div>
+        `;
+        return;
+      }
+      
+      notifyingCustomers.forEach(cust => {
+        const item = document.createElement('div');
+        item.className = 'p-2.5 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] space-y-1 text-left';
+        
+        let statusText = '';
+        if (cust.pendingRedeem) {
+          statusText = `<span class="text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded text-[9px] uppercase animate-pulse">Pending Claim: ${cust.pendingRedeem.code}</span>`;
+        } else {
+          statusText = `<span class="text-indigo-400 font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded text-[9px] uppercase">Reward Ready</span>`;
+        }
+        
+        item.innerHTML = `
+          <div class="flex justify-between items-start">
+            <span class="font-bold text-white">${escapeHtml(cust.name || 'Anonymous')}</span>
+            ${statusText}
+          </div>
+          <div class="flex justify-between items-center text-[10px]">
+            <span class="text-slate-400 font-mono">${cust.phone}</span>
+            <span class="text-emerald-400 font-bold font-mono">${cust.points}/${maxPoints} Stamps</span>
+          </div>
+        `;
+        notificationList.appendChild(item);
+      });
+    }
+
+    function signOutOwner() {
+      sessionStorage.removeItem('owner_username');
+      sessionStorage.removeItem('owner_password');
+      loginOverlay.classList.remove('hidden');
+      dashboardContent.classList.add('hidden');
+      dashboardLoader.classList.add('hidden');
+      errorState.classList.add('hidden');
+      document.getElementById('suspendedOverlay').classList.add('hidden');
+      loginUsernameInput.value = '';
+      loginPasswordInput.value = '';
+      if (typeof closeMobileMenu === 'function') {
+        closeMobileMenu();
+      }
+    }
+
+    // Toggle dropdown
+    notificationBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      notificationDropdown.classList.toggle('hidden');
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+      if (!notificationDropdown.classList.contains('hidden') && !notificationDropdown.contains(e.target) && !notificationBtn.contains(e.target)) {
+        notificationDropdown.classList.add('hidden');
+      }
+    });
+
+    // Attach sign out event
+    signOutBtn.addEventListener('click', () => {
+      signOutOwner();
+    });
+
+    // --- MOBILE DRAWER MENUS FUNCTIONS ---
+
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenuDrawer = document.getElementById('mobileMenuDrawer');
+    const mobileMenuBackdrop = document.getElementById('mobileMenuBackdrop');
+    const hamburgerIcon = document.getElementById('hamburgerIcon');
+    const closeIcon = document.getElementById('closeIcon');
+
+    function openMobileMenu() {
+      mobileMenuDrawer.classList.remove('translate-x-full');
+      mobileMenuBackdrop.classList.remove('hidden');
+      setTimeout(() => {
+        mobileMenuBackdrop.classList.remove('opacity-0');
+      }, 10);
+      hamburgerIcon.classList.add('hidden');
+      closeIcon.classList.remove('hidden');
+    }
+
+    function closeMobileMenu() {
+      mobileMenuDrawer.classList.add('translate-x-full');
+      mobileMenuBackdrop.classList.add('opacity-0');
+      setTimeout(() => {
+        mobileMenuBackdrop.classList.add('hidden');
+      }, 300);
+      hamburgerIcon.classList.remove('hidden');
+      closeIcon.classList.add('hidden');
+    }
+
+    function switchTab(tabId) {
+      // If trial has expired, prevent clicking console or catalog
+      if (isTrialExpired && (tabId === 'console' || tabId === 'catalog')) {
+        alert('Your trial has expired. Please subscribe under the Subscription & Billing tab to access this section.');
+        return;
+      }
+
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`tabContent-${tabId}`).classList.remove('hidden');
+      
+      document.querySelectorAll('#ownerTabs button').forEach(btn => {
+        if (btn.id === `tabBtn-${tabId}`) {
+          btn.classList.remove('border-indigo-500', 'text-indigo-400'); // reset
+          btn.classList.remove('border-transparent', 'text-slate-400');
+          btn.classList.add('border-indigo-500', 'text-indigo-400');
+        } else {
+          btn.classList.remove('border-indigo-500', 'text-indigo-400');
+          btn.classList.remove('border-transparent', 'text-slate-400');
+          btn.classList.add('border-transparent', 'text-slate-400');
+        }
+      });
+    }
+
+    function scrollToCard(cardId) {
+      let tabId = 'console';
+      if (cardId === 'catalogCard' || cardId === 'logoCard' || cardId === 'specialsCard') {
+        tabId = 'catalog';
+      } else if (cardId === 'dashboardBillingCard') {
+        tabId = 'subscription';
+      }
+      
+      switchTab(tabId);
+      
+      const card = document.getElementById(cardId);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth' });
+        closeMobileMenu();
+      }
+    }
+
+    mobileMenuBtn.addEventListener('click', () => {
+      const isOpen = !mobileMenuDrawer.classList.contains('translate-x-full');
+      if (isOpen) {
+        closeMobileMenu();
+      } else {
+        openMobileMenu();
+      }
+    });
+
+    mobileMenuBackdrop.addEventListener('click', closeMobileMenu);
+
+    window.scrollToCard = scrollToCard;
+    window.switchTab = switchTab;
+
+
+
+    // Auto refresh customer list, claims, and payments history every 5 seconds to show dynamic updates
+    setInterval(() => {
+      if (dashboardContent.classList.contains('hidden') === false) {
+        loadCustomers();
+        loadRedemptions();
+        loadBillingAndPayments();
+      }
+    }, 5000);
+
+    function closeWelcomeModal() {
+      document.getElementById('welcomeModal').classList.add('hidden');
+      localStorage.setItem(`welcome_dismissed_${shopSlug}`, 'true');
+    }
+
+    function closePlanSelectorModal() {
+      document.getElementById('planSelectorModal').classList.add('hidden');
+    }
+
+    function goToWizardStep(step) {
+      const steps = [1, 2, 3];
+      steps.forEach(s => {
+        const stepDiv = document.getElementById(`planWizardStep${s}`);
+        const header = document.getElementById(`wizardStepHeader-${s}`);
+        if (stepDiv) {
+          if (s === step) {
+            stepDiv.classList.remove('hidden');
+          } else {
+            stepDiv.classList.add('hidden');
+          }
+        }
+        if (header) {
+          const numberSpan = header.querySelector('span');
+          if (s === step) {
+            header.classList.add('text-indigo-400', 'font-extrabold');
+            header.classList.remove('text-slate-500', 'text-emerald-400');
+            if (numberSpan) {
+              numberSpan.classList.add('bg-indigo-600/20', 'text-indigo-400', 'border-indigo-500/35');
+              numberSpan.classList.remove('bg-slate-950', 'text-slate-500', 'border-slate-800', 'bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/25');
+            }
+          } else if (s < step) {
+            header.classList.add('text-emerald-400');
+            header.classList.remove('text-indigo-400', 'text-slate-500', 'font-extrabold');
+            if (numberSpan) {
+              numberSpan.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/25');
+              numberSpan.classList.remove('bg-indigo-600/20', 'text-indigo-400', 'border-indigo-500/35', 'bg-slate-955', 'text-slate-500', 'border-slate-800');
+            }
+          } else {
+            header.classList.remove('text-indigo-400', 'text-emerald-400', 'font-extrabold');
+            header.classList.add('text-slate-500');
+            if (numberSpan) {
+              numberSpan.classList.remove('bg-indigo-600/20', 'text-indigo-400', 'border-indigo-500/35', 'bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/25');
+              numberSpan.classList.add('bg-slate-950', 'text-slate-500', 'border-slate-800');
+            }
+          }
+        }
+      });
+    }
+
+    function selectSubscriptionPlan(method) {
+      tempSelectedPlan = method;
+      
+      const pricing = activePricing || {
+        systemDeveloperFee: 5000,
+        dailyFee: 50,
+        monthlyFee: 1500,
+        perStampDeveloperFee: 3000,
+        perStampFee: 1.0
+      };
+
+      const detailPlanName = document.getElementById('detailPlanName');
+      const detailSystemFee = document.getElementById('detailSystemFee');
+      const detailRate = document.getElementById('detailRate');
+      const detailEstimatedDue = document.getElementById('detailEstimatedDue');
+      const detailEstimatedDueLabel = document.getElementById('detailEstimatedDueLabel');
+      
+      if (method === 'onetime_daily') {
+        detailPlanName.textContent = 'Daily active';
+        detailSystemFee.textContent = `₱${pricing.systemDeveloperFee.toLocaleString()} (One-time)`;
+        detailRate.textContent = `₱${pricing.dailyFee}/day active`;
+        detailEstimatedDue.textContent = `₱${pricing.systemDeveloperFee.toLocaleString()}`;
+        detailEstimatedDueLabel.textContent = 'setup fee';
+      } else if (method === 'monthly') {
+        detailPlanName.textContent = 'Flat Monthly';
+        detailSystemFee.textContent = 'None';
+        detailRate.textContent = `₱${pricing.monthlyFee.toLocaleString()}/month`;
+        detailEstimatedDue.textContent = `₱${pricing.monthlyFee.toLocaleString()}`;
+        detailEstimatedDueLabel.textContent = 'first month subscription';
+      } else if (method === 'per_stamp') {
+        detailPlanName.textContent = 'Pay-Per-Stamp';
+        detailSystemFee.textContent = `₱${pricing.perStampDeveloperFee.toLocaleString()} (One-time)`;
+        detailRate.textContent = `₱${pricing.perStampFee.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 2})}/stamp issued`;
+        
+        let estimatedStamps = 0;
+        customersList.forEach(c => {
+          estimatedStamps += c.points || 0;
+          const redemptions = c.redemptions || [];
+          redemptions.forEach(r => {
+            estimatedStamps += r.pointsRedeemed || 0;
+          });
+        });
+        
+        const stampDue = estimatedStamps * pricing.perStampFee;
+        const totalEstDue = pricing.perStampDeveloperFee + stampDue;
+        
+        detailEstimatedDue.textContent = `₱${totalEstDue.toLocaleString()}`;
+        detailEstimatedDueLabel.textContent = `incl. ₱${pricing.perStampDeveloperFee.toLocaleString()} setup + ₱${stampDue.toLocaleString()} for ${estimatedStamps} stamps`;
+      }
+      
+      goToWizardStep(2);
+    }
+
+    async function confirmWizardPlan() {
+      if (!tempSelectedPlan) return;
+      
+      try {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/subscription-plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscriptionMethod: tempSelectedPlan })
+        });
+        
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to update plan selection.');
+        }
+        
+        const data = await response.json();
+        sessionStorage.setItem(`subscribe_revealed_${shopSlug}`, 'true');
+        
+        if (data.pricing) {
+          activePricing = data.pricing;
+          updatePlanCardsPricing(data.pricing);
+        }
+        
+        renderBillingDetails(data.billingSummary);
+        
+        const pricing = data.pricing || activePricing || {
+          systemDeveloperFee: 1500,
+          dailyFee: 0,
+          monthlyFee: 1899,
+          perStampDeveloperFee: 3000,
+          perStampFee: 1.0
+        };
+        
+        let planCost = 0;
+        if (tempSelectedPlan === 'onetime_daily') {
+          planCost = pricing.systemDeveloperFee !== undefined ? pricing.systemDeveloperFee : (pricing.onetimeSetupFee !== undefined ? pricing.onetimeSetupFee : 1500);
+        } else if (tempSelectedPlan === 'monthly') {
+          planCost = pricing.monthlyFee !== undefined ? pricing.monthlyFee : 1899;
+        } else if (tempSelectedPlan === 'per_stamp') {
+          planCost = pricing.perStampDeveloperFee !== undefined ? pricing.perStampDeveloperFee : 3000;
+        }
+
+        const balance = (data.billingSummary && data.billingSummary.outstandingBalance > 0)
+          ? data.billingSummary.outstandingBalance
+          : planCost;
+
+        document.getElementById('wizardPaymentAmount').value = balance;
+
+        // Update step 3 selected plan name and amount highlighted text
+        let planLabel = '';
+        if (tempSelectedPlan === 'onetime_daily') {
+          planLabel = 'Daily active';
+        } else if (tempSelectedPlan === 'monthly') {
+          planLabel = 'Flat Monthly';
+        } else if (tempSelectedPlan === 'per_stamp') {
+          planLabel = 'Pay-Per-Stamp';
+        } else {
+          planLabel = tempSelectedPlan || 'Unknown';
+        }
+        
+        const badgeEl = document.getElementById('wizardHighlightPlanBadge');
+        if (badgeEl) {
+          badgeEl.textContent = planLabel;
+        }
+        const amountEl = document.getElementById('wizardHighlightAmount');
+        if (amountEl) {
+          amountEl.textContent = `₱${balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        }
+        
+        if (data.paymentQr) {
+          document.getElementById('wizardQrImg').src = data.paymentQr;
+          document.getElementById('wizardInstructions').textContent = data.paymentInstructions;
+        } else if (paymentQrUrl) {
+          document.getElementById('wizardQrImg').src = paymentQrUrl;
+          document.getElementById('wizardInstructions').textContent = paymentInstructionsText;
+        }
+
+        document.getElementById('dashboardBillingCard').classList.remove('hidden');
+        
+        goToWizardStep(3);
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function showPaidSubscriptionInfo() {
+      goToWizardStep(1);
+      document.getElementById('planSelectorModal').classList.remove('hidden');
+    }
+
+    // Wizard step 3 receipt change listener & submission
+    setTimeout(() => {
+      const wizardReceiptFile = document.getElementById('wizardReceiptFile');
+      const wizardReceiptUploadText = document.getElementById('wizardReceiptUploadText');
+      if (wizardReceiptFile) {
+        wizardReceiptFile.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (!file) {
+            wizardReceiptUploadText.textContent = 'Choose GCash Receipt...';
+            wizardReceiptBase64 = null;
+            return;
+          }
+          if (file.size > 2 * 1024 * 1024) {
+            alert('Receipt image size exceeds 2MB limit.');
+            wizardReceiptFile.value = '';
+            wizardReceiptUploadText.textContent = 'Choose GCash Receipt...';
+            wizardReceiptBase64 = null;
+            return;
+          }
+          wizardReceiptUploadText.textContent = file.name;
+          const reader = new FileReader();
+          reader.onload = () => {
+            wizardReceiptBase64 = reader.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const wizardPaymentForm = document.getElementById('wizardPaymentForm');
+      if (wizardPaymentForm) {
+        wizardPaymentForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const amount = parseFloat(document.getElementById('wizardPaymentAmount').value);
+          const refNumber = document.getElementById('wizardRefNumber').value.trim();
+          
+          if (isNaN(amount) || amount <= 0) {
+            alert('Please enter a valid positive payment amount.');
+            return;
+          }
+          if (!wizardReceiptBase64) {
+            alert('Please upload a GCash Receipt image.');
+            return;
+          }
+
+          try {
+            const response = await fetchWithAuth(`/api/shops/${shopSlug}/payment`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                amount, 
+                referenceNumber: refNumber || undefined,
+                receiptImage: wizardReceiptBase64 
+              })
+            });
+
+            if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.error || 'Failed to submit payment receipt.');
+            }
+
+            const billingData = await response.json();
+            renderBillingDetails(billingData.billingSummary);
+            renderPaymentsHistory(billingData.payments || []);
+            
+            document.getElementById('wizardPaymentAmount').value = '';
+            document.getElementById('wizardRefNumber').value = '';
+            if (wizardReceiptFile) {
+              wizardReceiptFile.value = '';
+            }
+            wizardReceiptUploadText.textContent = 'Choose GCash Receipt...';
+            wizardReceiptBase64 = null;
+            
+            closePlanSelectorModal();
+            
+            alert(`Success! Payment receipt of ₱${amount.toLocaleString()} has been submitted. It will show up as pending until verified by the platform administrator.`);
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+      }
+    }, 100);
+
+    window.closeWelcomeModal = closeWelcomeModal;
+    window.closePlanSelectorModal = closePlanSelectorModal;
+    window.goToWizardStep = goToWizardStep;
+    window.selectSubscriptionPlan = selectSubscriptionPlan;
+    window.confirmWizardPlan = confirmWizardPlan;
+    window.showPaidSubscriptionInfo = showPaidSubscriptionInfo;
+
+    init();
+  </script>
+</body>
+</html>
