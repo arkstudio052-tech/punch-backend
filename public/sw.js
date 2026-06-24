@@ -1,4 +1,4 @@
-const CACHE_NAME = 'punch-loyalty-cache-v11';
+const CACHE_NAME = 'punch-loyalty-cache-v12';
 const ASSETS = [
   '/',
   '/index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   '/images/icon-192.png',
   '/images/icon-512.png',
   '/images/punch_cover_photo.png',
+  '/images/punch_cover_banner.png',
   '/images/punch_promo_banner.png',
   '/manifest.json'
 ];
