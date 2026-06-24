@@ -2,11 +2,45 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
+html {
+  background-color: #020617; /* Dark slate fallback */
+}
+
 body {
   font-family: 'Outfit', sans-serif;
-  background: radial-gradient(circle at top right, #1e1b4b 0%, #0f172a 100%);
+  background: transparent !important; /* Force override gradient and Tailwind background colors */
   color: #f8fafc;
   min-height: 100vh;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -2;
+  background-image: url('/images/punch_cover_photo.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(15px);
+  transform: scale(1.05); /* Prevent vignetting white edges when blurred */
+  pointer-events: none;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  background-color: rgba(2, 6, 23, 0.50); /* 50% transparency black/dark overlay */
+  pointer-events: none;
 }
 
 /* Glassmorphism styling */
