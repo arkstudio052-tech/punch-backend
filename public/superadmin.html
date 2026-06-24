@@ -220,15 +220,15 @@
     <div id="adminContent" class="hidden space-y-8 w-full">
       
       <!-- Desktop Tab Navigation -->
-      <div class="flex border-b border-slate-800 gap-2 overflow-x-auto pb-px" id="adminTabs">
-        <button onclick="switchTab('tenants')" id="tabBtn-tenants" class="px-5 py-3 border-b-2 border-indigo-500 text-indigo-400 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
-          <span>🏪</span> Store Tenants
+      <div class="flex border-b border-slate-800 gap-1 sm:gap-2 overflow-x-auto pb-px justify-around sm:justify-start w-full sm:w-auto" id="adminTabs">
+        <button onclick="switchTab('tenants')" id="tabBtn-tenants" class="px-3 sm:px-5 py-3 border-b-2 border-indigo-500 text-indigo-400 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center justify-center gap-2">
+          <span>🏪</span> <span class="max-sm:hidden">Store Tenants</span>
         </button>
-        <button onclick="switchTab('verification')" id="tabBtn-verification" class="px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
-          <span>📄</span> Payment Verification
+        <button onclick="switchTab('verification')" id="tabBtn-verification" class="px-3 sm:px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center justify-center gap-2">
+          <span>📄</span> <span class="max-sm:hidden">Payment Verification</span>
         </button>
-        <button onclick="switchTab('settings')" id="tabBtn-settings" class="px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
-          <span>💳</span> Global Settings
+        <button onclick="switchTab('settings')" id="tabBtn-settings" class="px-3 sm:px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center justify-center gap-2">
+          <span>💳</span> <span class="max-sm:hidden">Global Settings</span>
         </button>
       </div>
 
@@ -236,7 +236,7 @@
 
       <!-- Tab 1: Tenants -->
       <div id="tabContent-tenants" class="tab-panel space-y-6">
-        <div id="storeTenantsCard" class="glass p-6 rounded-2xl border border-slate-800 space-y-4">
+        <div id="storeTenantsCard" class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4">
           <div class="flex justify-between items-center">
             <h3 class="text-xl font-bold text-white flex items-center gap-2">
               <span>🏪</span> Store Tenants
@@ -276,7 +276,7 @@
 
       <!-- Tab 2: Payment Verification -->
       <div id="tabContent-verification" class="tab-panel space-y-6 hidden">
-        <div id="paymentVerificationCard" class="glass p-6 rounded-2xl border border-slate-800 space-y-4">
+        <div id="paymentVerificationCard" class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4">
           <div class="flex justify-between items-center">
             <h3 class="text-xl font-bold text-white flex items-center gap-2">
               <span>📄</span> Payment Verification
@@ -323,7 +323,7 @@
 
       <!-- Tab 2: Settings -->
       <div id="tabContent-settings" class="tab-panel space-y-6 hidden">
-        <div id="billingSettingsCard" class="glass p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo max-w-2xl mx-auto">
+        <div id="billingSettingsCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo max-w-2xl mx-auto">
           <h3 class="text-lg font-bold text-white flex items-center gap-2">
             <span>💳</span> Global Billing Info
           </h3>
@@ -458,7 +458,7 @@
     </div>
   <!-- View Receipt Modal -->
   <div id="viewReceiptModal" class="fixed inset-0 z-45 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-md transition-all duration-300 p-4">
-    <div class="w-full max-w-lg p-6 glass border border-indigo-500/10 rounded-3xl space-y-4 shadow-2xl relative overflow-hidden text-left bg-slate-900/95">
+    <div class="w-full max-w-lg p-4 sm:p-6 glass border border-indigo-500/10 rounded-3xl space-y-4 shadow-2xl relative overflow-hidden text-left bg-slate-900/95">
       <button 
         type="button" 
         onclick="closeViewReceiptModal()" 
@@ -494,7 +494,7 @@
   <div id="mobileMenuBackdrop" class="fixed inset-0 z-30 bg-slate-950/60 hidden transition-opacity duration-300 opacity-0"></div>
 
   <!-- Mobile Drawer Menu (solid slate backdrop for crisp unblurred view) -->
-  <div id="mobileMenuDrawer" class="fixed inset-y-0 right-0 z-40 w-72 bg-slate-950/98 border-l border-slate-800 p-6 flex flex-col justify-between shadow-2xl transition-transform duration-300 transform translate-x-full md:hidden">
+  <div id="mobileMenuDrawer" class="fixed inset-y-0 right-0 z-40 w-72 bg-slate-950 border-l border-slate-800 p-6 flex flex-col justify-between shadow-2xl transition-transform duration-300 transform translate-x-full md:hidden">
     <div class="space-y-6">
       <div class="flex justify-between items-center border-b border-slate-850 pb-4">
         <h4 class="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
