@@ -1373,32 +1373,73 @@
         document.getElementById('dashboardBillingCard').classList.add('hidden');
       }
 
+      const trialStatusCard = document.getElementById('trialStatusCard');
+      const trialStatusTitle = document.querySelector('#trialStatusCard h3');
+      const trialStatusText = document.querySelector('#trialStatusCard p');
+      const trialStatusBtn = document.querySelector('#trialStatusCard button');
+      const trialDaysLeftText = document.getElementById('trialDaysLeftText');
+      const trialProgressBar = document.getElementById('trialProgressBar');
+
       if (method === 'trial') {
         const remainingDays = Math.max(0, 7 - (daysActive - 1));
-        document.getElementById('trialDaysLeftText').textContent = `${remainingDays}/7 days`;
-        document.getElementById('trialProgressBar').style.width = `${Math.round((remainingDays / 7) * 100)}%`;
+        if (trialDaysLeftText) trialDaysLeftText.textContent = `${remainingDays}/7 days`;
+        if (trialProgressBar) trialProgressBar.style.width = `${Math.round((remainingDays / 7) * 100)}%`;
         
-        document.getElementById('trialStatusCard').classList.remove('hidden');
-        
-        // Ensure trial card texts are active trial state
-        const upgradeBtn = document.querySelector('#trialStatusCard button');
-        if (upgradeBtn) {
-          upgradeBtn.innerHTML = `🚀 Upgrade to Premium Plan`;
+        if (trialStatusCard) trialStatusCard.classList.remove('hidden');
+        if (trialStatusBtn) {
+          trialStatusBtn.innerHTML = `🚀 Upgrade to Premium Plan`;
+          trialStatusBtn.classList.remove('hidden');
         }
-        document.querySelector('#trialStatusCard h3').innerHTML = `<span>🎁</span> Free Trial Active`;
-        document.querySelector('#trialStatusCard p').textContent = `Your store loyalty portal is currently on the 7-day free trial. You have full access to all features to test the system before starting a paid subscription.`;
-      } else {
-        // Trial has expired
-        document.getElementById('trialDaysLeftText').textContent = `0/7 days`;
-        document.getElementById('trialProgressBar').style.width = `0%`;
-        document.getElementById('trialStatusCard').classList.remove('hidden');
+        if (trialStatusTitle) trialStatusTitle.innerHTML = `<span>🎁</span> Free Trial Active`;
+        if (trialStatusText) trialStatusText.textContent = `Your store loyalty portal is currently on the 7-day free trial. You have full access to all features to test the system before starting a paid subscription.`;
+      } else if (method === 'monthly') {
+        const isExpired = billingSummary.isExpired;
+        const expirationDate = new Date(billingSummary.expirationDate);
+        const diffDays = billingSummary.diffDays || 0;
+        const totalDays = (billingSummary.monthlyPlanMonths || 3) * 30; // approximate total days in term
+        const remainingDays = Math.max(0, diffDays);
         
-        // Change title and button text on the trial card to indicate expired state
-        document.querySelector('#trialStatusCard h3').innerHTML = `<span>⚠️</span> Free Trial Expired`;
-        document.querySelector('#trialStatusCard p').textContent = `Your 7-day free trial has expired. To reactivate cashier scanning and customer points features, please choose a subscription plan and settle the balance.`;
-        const upgradeBtn = document.querySelector('#trialStatusCard button');
-        if (upgradeBtn) {
-          upgradeBtn.innerHTML = `🚀 Subscribe to Premium Plan`;
+        if (isExpired) {
+          if (trialDaysLeftText) trialDaysLeftText.textContent = `Expired`;
+          if (trialProgressBar) trialProgressBar.style.width = `0%`;
+          if (trialStatusCard) trialStatusCard.classList.remove('hidden');
+          if (trialStatusTitle) trialStatusTitle.innerHTML = `<span>⚠️</span> Subscription Expired`;
+          if (trialStatusText) trialStatusText.textContent = `Your Flat Rate subscription has expired. Please settle the outstanding balance to reactivate cashier stamp and redemption features.`;
+          if (trialStatusBtn) {
+            trialStatusBtn.innerHTML = `🔄 Settle Balance & Renew`;
+            trialStatusBtn.classList.remove('hidden');
+          }
+        } else {
+          // ACTIVE Flat Rate Subscription!
+          if (trialDaysLeftText) trialDaysLeftText.textContent = `${remainingDays}/${totalDays} days left`;
+          if (trialProgressBar) {
+            const pct = Math.min(100, Math.round((remainingDays / totalDays) * 100));
+            trialProgressBar.style.width = `${pct}%`;
+          }
+          if (trialStatusCard) trialStatusCard.classList.remove('hidden');
+          if (trialStatusTitle) trialStatusTitle.innerHTML = `<span>🚀</span> Flat Rate Subscription Active`;
+          if (trialStatusText) trialStatusText.textContent = `Your store is currently subscribed to the Flat Rate plan. Your subscription is active and in good standing until ${formatDateShort(expirationDate)}.`;
+          if (trialStatusBtn) {
+            trialStatusBtn.innerHTML = `🔄 Extend Subscription`;
+            trialStatusBtn.classList.remove('hidden');
+          }
+        }
+      } else {
+        // Daily active / Per Stamp paid plans
+        if (billingSummary.outstandingBalance > 0) {
+          // Prompt to pay
+          if (trialDaysLeftText) trialDaysLeftText.textContent = `Payment Overdue`;
+          if (trialProgressBar) trialProgressBar.style.width = `0%`;
+          if (trialStatusCard) trialStatusCard.classList.remove('hidden');
+          if (trialStatusTitle) trialStatusTitle.innerHTML = `<span>⚠️</span> Subscription Payment Overdue`;
+          if (trialStatusText) trialStatusText.textContent = `You have an outstanding balance on your active plan. Please settle the balance to keep cashier functions active.`;
+          if (trialStatusBtn) {
+            trialStatusBtn.innerHTML = `💳 Settle Outstanding Balance`;
+            trialStatusBtn.classList.remove('hidden');
+          }
+        } else {
+          // Paid plan active, no outstanding balance
+          if (trialStatusCard) trialStatusCard.classList.add('hidden');
         }
       }
     }
