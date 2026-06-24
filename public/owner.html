@@ -233,9 +233,9 @@
       <!-- Tab 1: Console -->
       <div id="tabContent-console" class="tab-panel grid md:grid-cols-3 gap-8">
         <!-- Left Column: Controls -->
-        <div class="md:col-span-1 space-y-6">
+        <div class="md:col-span-1 space-y-6 min-w-0 w-full">
           <!-- Loyalty QR Scanner & Simulator Card -->
-          <div id="scanSimCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo">
+          <div id="scanSimCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo w-full">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 class="text-base font-bold text-white flex items-center gap-2">
                 <span>📷</span> Loyalty Scanner
@@ -325,7 +325,7 @@
           </div>
 
           <!-- Verify Redemption Code Card -->
-          <div id="confirmRedeemCard" class="glass p-4 sm:p-6 rounded-2xl border border-amber-500/20 space-y-4 glow-indigo">
+          <div id="confirmRedeemCard" class="glass p-4 sm:p-6 rounded-2xl border border-amber-500/20 space-y-4 glow-indigo w-full">
             <h3 class="text-lg font-bold text-white flex items-center gap-2">
               <span>🎁</span> Confirm Redemption
             </h3>
@@ -354,9 +354,9 @@
         </div>
 
         <!-- Right Column: Registered Customers -->
-        <div class="md:col-span-2 space-y-6">
+        <div class="md:col-span-2 space-y-6 min-w-0 w-full">
           <!-- Customers Card -->
-          <div id="customersCard" class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div id="customersCard" class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4 w-full">
             <div class="flex justify-between items-center">
               <h3 class="text-xl font-bold text-white">Registered Customers</h3>
               <span id="customerCountBadge" class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold px-2.5 py-1 rounded-full">
@@ -396,7 +396,7 @@
           </div>
 
           <!-- Claims History Card -->
-          <div id="historyCard" class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div id="historyCard" class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4 w-full">
             <h3 class="text-lg font-bold text-white flex items-center gap-2">
               <span>🏆</span> Recent Redemptions History
             </h3>
@@ -426,9 +426,9 @@
       <!-- Tab 2: Rewards & Branding -->
       <div id="tabContent-catalog" class="tab-panel grid md:grid-cols-3 gap-8 hidden">
         <!-- Left Column: Rules & Logo -->
-        <div class="md:col-span-1 space-y-6">
+        <div class="md:col-span-1 space-y-6 min-w-0 w-full">
           <!-- Shop Rules Summary Card -->
-          <div class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4">
+          <div class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4 w-full">
             <h3 class="text-lg font-bold text-white">Store Rules</h3>
             <div class="space-y-3">
               <div>
@@ -443,7 +443,7 @@
           </div>
 
           <!-- Store Logo Card -->
-          <div class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4 w-full">
             <h3 class="text-lg font-bold text-white flex items-center gap-2">
               <span>🖼️</span> Store Logo
             </h3>
@@ -464,9 +464,9 @@
         </div>
 
         <!-- Right Column: Catalog List & Specials -->
-        <div class="md:col-span-2 space-y-6">
+        <div class="md:col-span-2 space-y-6 min-w-0 w-full">
           <!-- Rewards Catalog Card -->
-          <div id="catalogCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo">
+          <div id="catalogCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo w-full">
             <h3 class="text-lg font-bold text-white flex items-center justify-between">
               <span class="flex items-center gap-2"><span>🎁</span> Rewards Catalog</span>
               <span class="text-[10px] text-slate-400 font-mono tracking-wider bg-slate-900 px-2 py-0.5 rounded border border-slate-800 uppercase">Seasonal Catalog</span>
@@ -513,7 +513,7 @@
           </div>
 
           <!-- Specials Card -->
-          <div class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4" id="specialsCard">
+          <div class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4 w-full" id="specialsCard">
             <h3 class="text-lg font-bold text-white flex items-center gap-2">
               <span>📢</span> Specials & Menu Items
             </h3>
@@ -541,9 +541,9 @@
       <!-- Tab 3: Subscription & Billing -->
       <div id="tabContent-subscription" class="tab-panel grid md:grid-cols-3 gap-8 hidden">
         <!-- Left Column: Current Statement -->
-        <div class="md:col-span-1 space-y-6">
+        <div class="md:col-span-1 space-y-6 min-w-0 w-full">
           <!-- Platform Billing Info Card -->
-          <div id="dashboardBillingCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo hidden">
+          <div id="dashboardBillingCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo hidden w-full">
             <h3 class="text-md font-bold text-white flex items-center gap-2">
               <span>💳</span> Platform Billing Info
             </h3>
@@ -562,9 +562,9 @@
         </div>
 
         <!-- Right Column: GCash Payment Simulation Card / Trial Status -->
-        <div class="md:col-span-2 space-y-6">
+        <div class="md:col-span-2 space-y-6 min-w-0 w-full">
           <!-- Trial Status Card (visible during trial) -->
-          <div id="trialStatusCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-5 glow-indigo hidden text-left">
+          <div id="trialStatusCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-5 glow-indigo hidden text-left w-full">
             <h3 class="text-lg font-bold text-white flex items-center gap-2">
               <span>🎁</span> Free Trial Active
             </h3>
@@ -597,7 +597,7 @@
 
 
           <!-- Payment History & Receipts Card -->
-          <div id="paymentHistoryCard" class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div id="paymentHistoryCard" class="glass p-4 sm:p-6 rounded-2xl border border-slate-800 space-y-4 w-full">
             <h3 class="text-lg font-bold text-white flex items-center gap-2">
               <span>📄</span> Payment History & Receipts
             </h3>
@@ -627,7 +627,7 @@
 
       <!-- Tab 4: QR Codes Sharing Portal -->
       <div id="tabContent-qrportal" class="tab-panel space-y-6 hidden">
-        <div id="qrPortalCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-6 glow-indigo max-w-4xl mx-auto text-left">
+        <div id="qrPortalCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-6 glow-indigo max-w-4xl mx-auto text-left w-full">
           <div class="border-b border-slate-800 pb-4">
             <h3 class="text-xl font-bold text-white flex items-center gap-2">
               <span>📱</span> Share & Download Store QR Codes
@@ -639,7 +639,7 @@
 
           <div class="grid md:grid-cols-2 gap-8">
             <!-- Customer Portal QR Code Column -->
-            <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-between text-center space-y-4">
+            <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-between text-center space-y-4 w-full max-w-full">
               <div class="space-y-1">
                 <span class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 px-2.5 py-1 rounded-full uppercase tracking-wider text-[10px] font-bold">Customer Portal</span>
                 <h4 class="text-base font-bold text-white mt-1">Digital Stamp Card QR</h4>
@@ -671,7 +671,7 @@
             </div>
 
             <!-- Owner Cashier Console QR Code Column -->
-            <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-between text-center space-y-4">
+            <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-between text-center space-y-4 w-full max-w-full">
               <div class="space-y-1">
                 <span class="bg-amber-500/10 text-amber-400 border border-amber-500/25 px-2.5 py-1 rounded-full uppercase tracking-wider text-[10px] font-bold">Manager Console</span>
                 <h4 class="text-base font-bold text-white mt-1">Cashier Dashboard QR</h4>
