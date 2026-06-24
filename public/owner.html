@@ -8,6 +8,18 @@
   <link rel="stylesheet" href="/css/style.css">
   <script src="/config.js"></script>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="apple-touch-icon" href="/images/icon-192.png">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('Service Worker registered:', reg.scope))
+          .catch((err) => console.error('Service Worker registration failed:', err));
+      });
+    }
+  </script>
   <script>
     (function() {
       const originalFetch = window.fetch;
@@ -654,10 +666,16 @@
               </div>
 
               <div class="w-full space-y-3">
-                <div class="bg-slate-950/80 border border-slate-850 px-4 py-2.5 rounded-xl flex items-center justify-between gap-2 text-xs">
+                <div class="bg-slate-950/80 border border-slate-850 px-4 py-2.5 rounded-xl flex items-center justify-between gap-2 text-xs w-full min-w-0 overflow-hidden">
                   <span class="text-slate-400 truncate select-all font-mono" id="portalQrUrlText">https://...</span>
                   <button onclick="copyToClipboard('portalQrUrlText')" class="text-indigo-400 hover:text-indigo-300 font-bold shrink-0 focus:outline-none">Copy</button>
                 </div>
+                <button 
+                  onclick="sharePortalLink('portalQrUrlText', 'Customer Loyalty Portal')"
+                  class="w-full bg-slate-800 hover:bg-slate-750 text-indigo-400 hover:text-indigo-300 border border-slate-750 font-bold py-2.5 px-4 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 focus:outline-none shadow-md"
+                >
+                  <span>🔗</span> Share Portal Link (Messenger, WhatsApp...)
+                </button>
                 <button 
                   onclick="downloadQrCode('portalQrCodeImg', 'customer-portal-qr')"
                   class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 focus:outline-none shadow-md"
@@ -686,10 +704,16 @@
               </div>
 
               <div class="w-full space-y-3">
-                <div class="bg-slate-950/80 border border-slate-850 px-4 py-2.5 rounded-xl flex items-center justify-between gap-2 text-xs">
+                <div class="bg-slate-950/80 border border-slate-850 px-4 py-2.5 rounded-xl flex items-center justify-between gap-2 text-xs w-full min-w-0 overflow-hidden">
                   <span class="text-slate-400 truncate select-all font-mono" id="consoleQrUrlText">https://...</span>
                   <button onclick="copyToClipboard('consoleQrUrlText')" class="text-indigo-400 hover:text-indigo-300 font-bold shrink-0 focus:outline-none">Copy</button>
                 </div>
+                <button 
+                  onclick="sharePortalLink('consoleQrUrlText', 'Manager Console')"
+                  class="w-full bg-slate-800 hover:bg-slate-750 text-indigo-400 hover:text-indigo-300 border border-slate-750 font-bold py-2.5 px-4 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 focus:outline-none shadow-md"
+                >
+                  <span>🔗</span> Share Console Link (Messenger, WhatsApp...)
+                </button>
                 <button 
                   onclick="downloadQrCode('consoleQrCodeImg', 'cashier-console-qr')"
                   class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 focus:outline-none shadow-md"
@@ -2944,12 +2968,37 @@
       });
     }
 
+    function sharePortalLink(elementId, titleText) {
+      const text = document.getElementById(elementId).textContent;
+      if (navigator.share) {
+        navigator.share({
+          title: titleText,
+          text: `Join our loyalty program and earn digital stamps!`,
+          url: text
+        }).then(() => {
+          console.log('Shared successfully');
+        }).catch(err => {
+          // If user cancels sharing, avoid printing disturbing alert
+          if (err.name !== 'AbortError') {
+            console.error('Error sharing:', err);
+          }
+        });
+      } else {
+        navigator.clipboard.writeText(text).then(() => {
+          alert("Link copied! Paste it in Messenger, WhatsApp, or Viber to share.");
+        }).catch(err => {
+          console.error("Share copy fallback failed:", err);
+        });
+      }
+    }
+
     window.switchScannerTab = switchScannerTab;
     window.startCameraScanner = startCameraScanner;
     window.stopCameraScanner = stopCameraScanner;
     window.resetScannerUI = resetScannerUI;
     window.downloadQrCode = downloadQrCode;
     window.copyToClipboard = copyToClipboard;
+    window.sharePortalLink = sharePortalLink;
 
     init();
   </script>
