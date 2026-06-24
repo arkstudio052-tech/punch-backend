@@ -1380,7 +1380,44 @@
       const trialDaysLeftText = document.getElementById('trialDaysLeftText');
       const trialProgressBar = document.getElementById('trialProgressBar');
 
-      if (method === 'trial') {
+      const hasPendingPayment = shop && shop.payments && shop.payments.some(p => p.status === 'pending');
+
+      if (hasPendingPayment) {
+        const planMethod = billingSummary.selectedPlan || 'monthly';
+        let planLabel = 'Flat Rate';
+        if (planMethod === 'onetime_daily') planLabel = 'Daily Plan';
+        if (planMethod === 'per_stamp') planLabel = 'Pay-Per-Stamp';
+        
+        if (trialDaysLeftText) trialDaysLeftText.textContent = `Awaiting Admin Verification`;
+        if (trialProgressBar) {
+          trialProgressBar.style.width = `100%`;
+          trialProgressBar.className = "bg-gradient-to-r from-amber-500 to-indigo-500 h-full rounded-full transition-all duration-500 animate-pulse";
+        }
+        
+        if (trialStatusCard) {
+          trialStatusCard.classList.remove('hidden');
+          trialStatusCard.className = "glass p-4 sm:p-6 rounded-2xl border border-amber-500/20 space-y-5 glow-amber text-left w-full max-w-full overflow-hidden";
+        }
+        if (trialStatusTitle) trialStatusTitle.innerHTML = `<span>⏳</span> Pending Subscription (${planLabel})`;
+        if (trialStatusText) trialStatusText.textContent = `Your subscription payment receipt has been submitted and is currently pending verification by the platform administrator. Once verified, your subscription status will update automatically.`;
+        if (trialStatusBtn) {
+          trialStatusBtn.innerHTML = `⏳ Verification In Progress`;
+          trialStatusBtn.classList.remove('hidden');
+          trialStatusBtn.setAttribute('disabled', 'true');
+          trialStatusBtn.className = "bg-slate-800 text-slate-400 font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs cursor-not-allowed";
+        }
+      } else if (method === 'trial') {
+        if (trialStatusBtn) {
+          trialStatusBtn.removeAttribute('disabled');
+          trialStatusBtn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs";
+        }
+        if (trialStatusCard) {
+          trialStatusCard.className = "glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-5 glow-indigo hidden text-left w-full max-w-full overflow-hidden";
+        }
+        if (trialProgressBar) {
+          trialProgressBar.className = "bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-500";
+        }
+
         const remainingDays = Math.max(0, 7 - (daysActive - 1));
         if (trialDaysLeftText) trialDaysLeftText.textContent = `${remainingDays}/7 days`;
         if (trialProgressBar) trialProgressBar.style.width = `${Math.round((remainingDays / 7) * 100)}%`;
@@ -1393,6 +1430,17 @@
         if (trialStatusTitle) trialStatusTitle.innerHTML = `<span>🎁</span> Free Trial Active`;
         if (trialStatusText) trialStatusText.textContent = `Your store loyalty portal is currently on the 7-day free trial. You have full access to all features to test the system before starting a paid subscription.`;
       } else if (method === 'monthly') {
+        if (trialStatusBtn) {
+          trialStatusBtn.removeAttribute('disabled');
+          trialStatusBtn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs";
+        }
+        if (trialStatusCard) {
+          trialStatusCard.className = "glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-5 glow-indigo hidden text-left w-full max-w-full overflow-hidden";
+        }
+        if (trialProgressBar) {
+          trialProgressBar.className = "bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-500";
+        }
+
         const isExpired = billingSummary.isExpired;
         const expirationDate = new Date(billingSummary.expirationDate);
         const diffDays = billingSummary.diffDays || 0;
@@ -1425,6 +1473,17 @@
           }
         }
       } else {
+        if (trialStatusBtn) {
+          trialStatusBtn.removeAttribute('disabled');
+          trialStatusBtn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs";
+        }
+        if (trialStatusCard) {
+          trialStatusCard.className = "glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-5 glow-indigo hidden text-left w-full max-w-full overflow-hidden";
+        }
+        if (trialProgressBar) {
+          trialProgressBar.className = "bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-500";
+        }
+
         // Daily active / Per Stamp paid plans
         if (billingSummary.outstandingBalance > 0) {
           // Prompt to pay
