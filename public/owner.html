@@ -223,6 +223,9 @@
         <button onclick="switchTab('subscription')" id="tabBtn-subscription" class="px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
           <span>💳</span> Subscription & Billing
         </button>
+        <button onclick="switchTab('qrportal')" id="tabBtn-qrportal" class="px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-white hover:border-slate-700 font-bold text-sm transition-all focus:outline-none shrink-0 flex items-center gap-2">
+          <span>📱</span> Share QR Codes
+        </button>
       </div>
 
       <!-- Tab Panels -->
@@ -617,6 +620,86 @@
             <!-- Empty State -->
             <div id="ownerPaymentsEmptyState" class="hidden text-center py-6 text-slate-500 text-xs">
               No payment transactions recorded yet.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 4: QR Codes Sharing Portal -->
+      <div id="tabContent-qrportal" class="tab-panel space-y-6 hidden">
+        <div id="qrPortalCard" class="glass p-6 rounded-2xl border border-indigo-500/10 space-y-6 glow-indigo max-w-4xl mx-auto text-left">
+          <div class="border-b border-slate-800 pb-4">
+            <h3 class="text-xl font-bold text-white flex items-center gap-2">
+              <span>📱</span> Share & Download Store QR Codes
+            </h3>
+            <p class="text-slate-400 text-xs mt-1 leading-relaxed">
+              Generate, preview, and download loyalty cards QR codes to share with customers or print for your checkout counters.
+            </p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-8">
+            <!-- Customer Portal QR Code Column -->
+            <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-between text-center space-y-4">
+              <div class="space-y-1">
+                <span class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 px-2.5 py-1 rounded-full uppercase tracking-wider text-[10px] font-bold">Customer Portal</span>
+                <h4 class="text-base font-bold text-white mt-1">Digital Stamp Card QR</h4>
+                <p class="text-slate-400 text-xs max-w-xs mx-auto">
+                  Customers scan this to open their digital loyalty card stamp profile and join your points program.
+                </p>
+              </div>
+
+              <!-- QR Image Preview -->
+              <div class="bg-white p-4 rounded-2xl shadow-lg border border-slate-200 glow-indigo flex items-center justify-center">
+                <img id="portalQrCodeImg" src="" alt="Customer Portal QR Code" class="w-48 h-48 object-contain">
+              </div>
+
+              <div class="w-full space-y-3">
+                <div class="bg-slate-950/80 border border-slate-850 px-4 py-2.5 rounded-xl flex items-center justify-between gap-2 text-xs">
+                  <span class="text-slate-400 truncate select-all font-mono" id="portalQrUrlText">https://...</span>
+                  <button onclick="copyToClipboard('portalQrUrlText')" class="text-indigo-400 hover:text-indigo-300 font-bold shrink-0 focus:outline-none">Copy</button>
+                </div>
+                <button 
+                  onclick="downloadQrCode('portalQrCodeImg', 'customer-portal-qr')"
+                  class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 focus:outline-none shadow-md"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                  </svg>
+                  Download Customer QR (PNG)
+                </button>
+              </div>
+            </div>
+
+            <!-- Owner Cashier Console QR Code Column -->
+            <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-between text-center space-y-4">
+              <div class="space-y-1">
+                <span class="bg-amber-500/10 text-amber-400 border border-amber-500/25 px-2.5 py-1 rounded-full uppercase tracking-wider text-[10px] font-bold">Manager Console</span>
+                <h4 class="text-base font-bold text-white mt-1">Cashier Dashboard QR</h4>
+                <p class="text-slate-400 text-xs max-w-xs mx-auto">
+                  Scan this to open your store's cashier stamp-awarding and code-verification page on mobile devices.
+                </p>
+              </div>
+
+              <!-- QR Image Preview -->
+              <div class="bg-white p-4 rounded-2xl shadow-lg border border-slate-200 glow-indigo flex items-center justify-center">
+                <img id="consoleQrCodeImg" src="" alt="Manager Console QR Code" class="w-48 h-48 object-contain">
+              </div>
+
+              <div class="w-full space-y-3">
+                <div class="bg-slate-950/80 border border-slate-850 px-4 py-2.5 rounded-xl flex items-center justify-between gap-2 text-xs">
+                  <span class="text-slate-400 truncate select-all font-mono" id="consoleQrUrlText">https://...</span>
+                  <button onclick="copyToClipboard('consoleQrUrlText')" class="text-indigo-400 hover:text-indigo-300 font-bold shrink-0 focus:outline-none">Copy</button>
+                </div>
+                <button 
+                  onclick="downloadQrCode('consoleQrCodeImg', 'cashier-console-qr')"
+                  class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 focus:outline-none shadow-md"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                  </svg>
+                  Download Cashier QR (PNG)
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1030,6 +1113,9 @@
         <button onclick="scrollToCard('historyCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
           <span>🏆</span> Redemptions History
         </button>
+        <button onclick="scrollToCard('qrPortalCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
+          <span>📱</span> Share QR Codes
+        </button>
         <button id="mobileBtn-subscription" onclick="scrollToCard('dashboardBillingCard')" class="text-left w-full text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 border border-slate-850 rounded-xl py-3 px-4 text-xs font-semibold flex items-center gap-2.5 transition-all">
           <span>💳</span> Subscription Details
         </button>
@@ -1320,6 +1406,17 @@
         const response = await fetch(`/api/shops/${shopSlug}`);
         if (!response.ok) throw new Error('Shop not found');
         shop = await response.json();
+
+        // Populate QR Codes Portal URLs and QRs
+        const origin = window.location.origin;
+        const customerPortalUrl = `${origin}/${shopSlug}`;
+        const ownerConsoleUrl = `${origin}/${shopSlug}/owner`;
+
+        document.getElementById('portalQrUrlText').textContent = customerPortalUrl;
+        document.getElementById('consoleQrUrlText').textContent = ownerConsoleUrl;
+
+        document.getElementById('portalQrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(customerPortalUrl)}`;
+        document.getElementById('consoleQrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(ownerConsoleUrl)}`;
 
         // Brand login overlay & header & preview logos
         if (shop.name) {
@@ -2284,6 +2381,8 @@
         tabId = 'catalog';
       } else if (cardId === 'dashboardBillingCard') {
         tabId = 'subscription';
+      } else if (cardId === 'qrPortalCard') {
+        tabId = 'qrportal';
       }
       
       switchTab(tabId);
@@ -2814,10 +2913,43 @@
       }
     }
 
+    async function downloadQrCode(imgId, filename) {
+      const imgElement = document.getElementById(imgId);
+      if (!imgElement || !imgElement.src) return;
+      
+      try {
+        const response = await fetch(imgElement.src);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `${filename}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      } catch (e) {
+        console.error("Failed to download QR code:", e);
+        window.open(imgElement.src, '_blank');
+      }
+    }
+
+    function copyToClipboard(elementId) {
+      const text = document.getElementById(elementId).textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("URL copied to clipboard!");
+      }).catch(err => {
+        console.error("Copy failed:", err);
+      });
+    }
+
     window.switchScannerTab = switchScannerTab;
     window.startCameraScanner = startCameraScanner;
     window.stopCameraScanner = stopCameraScanner;
     window.resetScannerUI = resetScannerUI;
+    window.downloadQrCode = downloadQrCode;
+    window.copyToClipboard = copyToClipboard;
 
     init();
   </script>
