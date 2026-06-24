@@ -35,6 +35,64 @@
 </head>
 <body class="flex flex-col items-center justify-between p-6 md:p-12 min-h-screen bg-slate-950">
 
+  <!-- Hamburger Menu Sidebar / Drawer -->
+  <div id="menuDrawer" class="fixed inset-y-0 right-0 z-50 w-80 bg-slate-950/95 backdrop-blur-xl border-l border-slate-900 shadow-2xl p-6 transform translate-x-full transition-transform duration-300 flex flex-col justify-between">
+    <div class="space-y-6">
+      <!-- Drawer Header -->
+      <div class="flex justify-between items-center border-b border-slate-900 pb-4">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🎟️</span>
+          <span class="font-extrabold text-xl text-white">PUNCH MENU</span>
+        </div>
+        <button onclick="toggleMenuDrawer(false)" class="text-slate-400 hover:text-white transition-all text-lg p-1.5 rounded-full hover:bg-white/5 cursor-pointer border-0 bg-transparent">
+          ✕
+        </button>
+      </div>
+      
+      <!-- User Info inside Drawer -->
+      <div class="bg-indigo-650/10 border border-indigo-500/10 rounded-xl p-3.5 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-indigo-600/20 flex items-center justify-center font-bold text-indigo-400 text-xs shrink-0" id="drawerUserInitial">
+          U
+        </div>
+        <div class="min-w-0">
+          <span class="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">Logged In As</span>
+          <span class="block text-xs font-bold text-white truncate" id="drawerUserName">Loyalty Member</span>
+        </div>
+      </div>
+
+      <!-- Menu Items -->
+      <nav class="space-y-2">
+        <button onclick="menuAction('cards')" class="w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900/40 hover:bg-indigo-600/10 hover:text-indigo-400 text-slate-300 font-bold text-xs transition-all border-0 cursor-pointer">
+          <span class="text-base shrink-0">🎟️</span>
+          <span>My Cards</span>
+        </button>
+        <button onclick="menuAction('scan')" class="w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900/40 hover:bg-indigo-600/10 hover:text-indigo-400 text-slate-300 font-bold text-xs transition-all border-0 cursor-pointer">
+          <span class="text-base shrink-0">📷</span>
+          <span>Scan Store QR</span>
+        </button>
+        <button onclick="menuAction('slug')" class="w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900/40 hover:bg-indigo-600/10 hover:text-indigo-400 text-slate-300 font-bold text-xs transition-all border-0 cursor-pointer">
+          <span class="text-base shrink-0">✏️</span>
+          <span>Type Store Slug</span>
+        </button>
+        <button onclick="menuAction('merchant')" class="w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900/40 hover:bg-indigo-600/10 hover:text-indigo-400 text-slate-300 font-bold text-xs transition-all border-0 cursor-pointer">
+          <span class="text-base shrink-0">🏪</span>
+          <span>Switch to Merchant</span>
+        </button>
+      </nav>
+    </div>
+    
+    <!-- Sign Out Button at bottom of Drawer -->
+    <div class="pt-6 border-t border-slate-900">
+      <button onclick="menuAction('signout')" class="w-full bg-rose-950/20 hover:bg-rose-900/30 text-rose-400 border border-rose-900/30 font-bold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer">
+        <span class="text-sm">🚪</span>
+        <span>Sign Out</span>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Backdrop for Drawer -->
+  <div id="menuBackdrop" class="fixed inset-0 z-40 hidden bg-slate-950/60 backdrop-blur-sm transition-all duration-300" onclick="toggleMenuDrawer(false)"></div>
+
   <!-- Register Shop Modal Overlay -->
   <div id="registerModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/80 backdrop-blur-md transition-all duration-300 p-4">
     <div class="w-full max-w-lg p-6 md:p-8 glass border border-indigo-500/10 rounded-3xl space-y-6 shadow-2xl relative overflow-hidden">
@@ -157,79 +215,85 @@
   <!-- Main Content Header -->
   <header class="w-full max-w-5xl flex justify-between items-center mb-12 shrink-0">
     <div class="flex items-center gap-2">
+      <button id="menuBtn" onclick="toggleMenuDrawer(true)" class="hidden p-2 text-white bg-slate-900 border border-slate-800 rounded-xl hover:bg-slate-800 transition-all cursor-pointer mr-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+      </button>
       <span class="text-3xl">🎟️</span>
       <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
         PUNCH
       </h1>
     </div>
-    <span class="text-sm font-semibold tracking-wider text-indigo-400 bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-500/20">
+    <span class="text-sm font-semibold tracking-wider text-indigo-400 bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-500/20 sm:inline-block hidden">
       MVP PROTOTYPE
     </span>
   </header>
 
   <main class="w-full max-w-5xl flex-grow flex items-center justify-center my-auto px-4">
     <!-- Global Customer Profile Dashboard (shown when customer phone is saved in localStorage) -->
-    <div id="globalProfileView" class="w-full max-w-md glass p-8 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo hidden animate-fade-in">
+    <div id="globalProfileView" class="w-full max-w-5xl glass p-8 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo hidden animate-fade-in">
       <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
       <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
 
-      <!-- Welcome header & sign out -->
-      <div class="flex justify-between items-center border-b border-slate-900 pb-4 text-left">
+      <!-- Welcome header & profile info -->
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-slate-900 pb-5 text-left gap-3">
         <div>
           <span class="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Customer Wallet</span>
-          <h2 id="globalMemberName" class="text-xl font-black text-white">Welcome back!</h2>
+          <h2 id="globalMemberName" class="text-2xl font-black text-white tracking-tight">Welcome, Loyalty Member!</h2>
         </div>
-        <button onclick="globalSignOut()" class="text-[10px] font-bold text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer">
-          Sign Out
-        </button>
-      </div>
-
-      <!-- Point aggregation summary -->
-      <div class="bg-indigo-600/10 border border-indigo-500/20 rounded-2xl p-5 shadow-inner">
-        <span class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Total Stamps Collected</span>
-        <div id="globalTotalPoints" class="text-4xl font-extrabold text-white tracking-tight">
-          0 <span class="text-indigo-400 text-sm font-semibold tracking-normal uppercase">Stamps</span>
+        <div class="text-left sm:text-right shrink-0">
+          <span class="block text-[9px] font-bold text-slate-500 uppercase tracking-widest">Global Account</span>
+          <span id="globalMemberPhone" class="text-xs font-mono font-bold text-slate-350 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-900 inline-block mt-0.5"></span>
         </div>
       </div>
 
-      <!-- Tab Buttons for Wallet directory vs Switch to Manager -->
-      <div class="flex bg-slate-950/80 border border-slate-800 p-1 rounded-xl">
-        <button id="profileTabBtn-cards" onclick="switchProfileTab('cards')" class="flex-1 text-xs font-bold py-2 rounded-lg transition-all text-white bg-indigo-650/30 border-0 cursor-pointer shadow-sm">
-          🎟️ My Cards
-        </button>
-        <button id="profileTabBtn-merchant" onclick="switchProfileTab('merchant')" class="flex-1 text-xs font-bold py-2 rounded-lg transition-all text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer">
-          🏪 Switch to Merchant
-        </button>
-      </div>
-
-      <!-- Tab Content 1: My Loyalty Cards list -->
-      <div id="profileTabContent-cards" class="space-y-3 max-h-[14rem] overflow-y-auto pr-1">
-        <div id="membershipsList" class="space-y-2.5">
-          <!-- Dynamically populated customer loyalty cards -->
-          <div class="text-center py-8 text-slate-550 text-xs">
-            Loading stamp cards...
+      <!-- Responsive Grid Layout -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 text-left">
+        <!-- Left Column: Points stats & quick actions -->
+        <div class="md:col-span-5 space-y-6 flex flex-col justify-between">
+          <div class="bg-gradient-to-br from-indigo-950/20 to-slate-900/40 border border-indigo-500/15 rounded-2xl p-6 shadow-inner text-center flex-grow flex flex-col justify-center py-8">
+            <span class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Total Stamps Collected</span>
+            <div id="globalTotalPoints" class="text-5xl font-black text-white tracking-tight">
+              0 <span class="text-indigo-400 text-sm font-semibold tracking-normal uppercase">Stamps</span>
+            </div>
+            <p class="text-[9px] text-slate-500 mt-2">Aggregated across all registered stores</p>
+          </div>
+          
+          <!-- Quick actions card -->
+          <div class="bg-slate-900/30 border border-slate-900/60 rounded-2xl p-4.5 space-y-3">
+            <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quick Actions</h3>
+            <div class="grid grid-cols-2 gap-2.5">
+              <button onclick="startScanningFromProfile('customer')" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-2 rounded-xl transition-all shadow-md text-[10px] uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1">
+                📷 Scan QR
+              </button>
+              <button onclick="enterSlugFromProfile('customer')" class="bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 font-bold py-3 px-2 rounded-xl transition-all text-[10px] uppercase tracking-wide cursor-pointer text-center">
+                ✏️ Type Slug
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Tab Content 2: Merchant Portal information -->
-      <div id="profileTabContent-merchant" class="hidden space-y-4 text-left animate-fade-in p-1">
-        <p class="text-xs text-slate-450 leading-relaxed">
-          Are you a store manager or cashier? Access your cashier scanner tools to award loyalty stamps or verify rewards claims.
-        </p>
-        <button onclick="accessMerchantFromProfile()" class="w-full bg-slate-900 hover:bg-slate-850 text-white font-bold py-3 px-4 rounded-xl text-xs border border-slate-800 transition-all text-center cursor-pointer flex items-center justify-center gap-1.5">
-          🔐 Access Cashier Dashboard
-        </button>
-      </div>
-
-      <!-- Scan QR / Enter slug action button -->
-      <div class="pt-4 border-t border-slate-900 flex gap-3">
-        <button onclick="startScanningFromProfile('customer')" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md text-xs uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1.5">
-          📷 Scan Store QR
-        </button>
-        <button onclick="enterSlugFromProfile('customer')" class="flex-1 bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-850 font-bold py-3.5 px-4 rounded-xl transition-all text-xs uppercase tracking-wide cursor-pointer text-center">
-          ✏️ Type Store Slug
-        </button>
+        <!-- Right Column: Card Wallet List -->
+        <div class="md:col-span-7 space-y-4">
+          <div class="flex justify-between items-center pb-1">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <span>🎟️</span> My Loyalty Cards
+            </h3>
+            <span id="activeCardsCount" class="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full font-mono">
+              0 Cards
+            </span>
+          </div>
+          
+          <div class="max-h-[18.5rem] overflow-y-auto pr-1">
+            <div id="membershipsList" class="space-y-2.5">
+              <!-- Dynamically populated customer loyalty cards -->
+              <div class="text-center py-12 text-slate-550 text-xs">
+                Loading stamp cards...
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -445,11 +509,13 @@
       const roleSelectionView = document.getElementById('roleSelectionView');
       const scannerView = document.getElementById('scannerView');
       const globalProfileView = document.getElementById('globalProfileView');
+      const menuBtn = document.getElementById('menuBtn');
       
       if (phone) {
         roleSelectionView.classList.add('hidden');
         scannerView.classList.add('hidden');
         globalProfileView.classList.remove('hidden');
+        menuBtn.classList.remove('hidden');
         
         document.getElementById('globalMemberName').textContent = `Welcome, ${name}!`;
         loadGlobalProfile(phone);
@@ -457,17 +523,29 @@
         globalProfileView.classList.add('hidden');
         scannerView.classList.add('hidden');
         roleSelectionView.classList.remove('hidden');
+        menuBtn.classList.add('hidden');
       }
     }
 
     async function loadGlobalProfile(phone) {
       const membershipsList = document.getElementById('membershipsList');
       const globalTotalPoints = document.getElementById('globalTotalPoints');
+      const globalMemberPhone = document.getElementById('globalMemberPhone');
+      const activeCardsCount = document.getElementById('activeCardsCount');
+      
+      if (globalMemberPhone) {
+        globalMemberPhone.textContent = phone;
+      }
       
       try {
         const response = await fetch(`/api/global/profile/${encodeURIComponent(phone)}`);
         if (!response.ok) throw new Error('Failed to fetch profile info.');
         const profileData = await response.json();
+        
+        // Update cards count
+        if (activeCardsCount) {
+          activeCardsCount.textContent = `${profileData.memberships.length} Card${profileData.memberships.length === 1 ? '' : 's'}`;
+        }
         
         // Sum total points
         let total = 0;
@@ -477,7 +555,7 @@
         // Render memberships card list
         if (profileData.memberships.length === 0) {
           membershipsList.innerHTML = `
-            <div class="text-center py-8 text-slate-500 text-xs space-y-2">
+            <div class="text-center py-8 text-slate-550 text-xs space-y-2">
               <span class="text-3xl block">🎟️</span>
               <p class="font-bold">No loyalty cards added yet.</p>
               <p class="text-slate-650 max-w-[220px] mx-auto leading-relaxed">Scan a store QR code or type a store handle below to get your first loyalty stamps!</p>
@@ -521,23 +599,46 @@
       checkGlobalSession();
     }
 
-    function switchProfileTab(tab) {
-      const cardsBtn = document.getElementById('profileTabBtn-cards');
-      const merchantBtn = document.getElementById('profileTabBtn-merchant');
-      const cardsContent = document.getElementById('profileTabContent-cards');
-      const merchantContent = document.getElementById('profileTabContent-merchant');
-
-      if (tab === 'cards') {
-        cardsBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-white bg-indigo-650/30 border-0 cursor-pointer shadow-sm';
-        merchantBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer';
-        cardsContent.classList.remove('hidden');
-        merchantContent.classList.add('hidden');
+    function toggleMenuDrawer(isOpen) {
+      const drawer = document.getElementById('menuDrawer');
+      const backdrop = document.getElementById('menuBackdrop');
+      
+      if (isOpen) {
+        const name = localStorage.getItem('punch_global_name') || 'Loyalty Member';
+        document.getElementById('drawerUserName').textContent = name;
+        document.getElementById('drawerUserInitial').textContent = name.charAt(0).toUpperCase();
+        
+        backdrop.classList.remove('hidden');
+        setTimeout(() => {
+          drawer.classList.remove('translate-x-full');
+        }, 10);
       } else {
-        merchantBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-white bg-indigo-650/30 border-0 cursor-pointer shadow-sm';
-        cardsBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer';
-        cardsContent.classList.add('hidden');
-        merchantContent.classList.remove('hidden');
+        drawer.classList.add('translate-x-full');
+        setTimeout(() => {
+          backdrop.classList.add('hidden');
+        }, 300);
       }
+    }
+
+    function menuAction(action) {
+      toggleMenuDrawer(false);
+      
+      setTimeout(() => {
+        if (action === 'cards') {
+          const mList = document.getElementById('membershipsList');
+          if (mList) {
+            mList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        } else if (action === 'scan') {
+          startScanningFromProfile('customer');
+        } else if (action === 'slug') {
+          enterSlugFromProfile('customer');
+        } else if (action === 'merchant') {
+          accessMerchantFromProfile();
+        } else if (action === 'signout') {
+          globalSignOut();
+        }
+      }, 300);
     }
 
     function startScanningFromProfile(role) {
