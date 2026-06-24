@@ -49,7 +49,7 @@
     </div>
 
     <!-- Slide Viewport (Stretches to fill vertical space) -->
-    <div class="relative w-full max-w-lg flex-grow my-6 rounded-3xl overflow-hidden border border-slate-900 bg-slate-950 shadow-2xl flex items-center justify-center">
+    <div id="welcomeSlideViewport" class="relative w-full max-w-lg flex-grow my-6 rounded-3xl overflow-hidden border border-slate-900 bg-slate-950 shadow-2xl flex items-center justify-center">
       <!-- Slide 1 -->
       <img id="welcomeSlide1" src="/images/punch_cover_photo.png" alt="Cover Photo" class="absolute w-full h-full object-contain transition-opacity duration-700 opacity-100">
       <!-- Slide 2 -->
@@ -59,7 +59,7 @@
     <!-- Footer Action / Dots Section -->
     <div class="w-full max-w-lg shrink-0 space-y-5">
       <!-- Dots Indicators -->
-      <div class="flex justify-center items-center gap-2">
+      <div id="welcomeDotsContainer" class="flex justify-center items-center gap-2">
         <div id="welcomeDot1" class="w-2.5 h-1.5 rounded-full bg-indigo-500 transition-all duration-300"></div>
         <div id="welcomeDot2" class="w-1.5 h-1.5 rounded-full bg-slate-700 transition-all duration-300"></div>
       </div>
@@ -991,36 +991,124 @@
     window.cancelDirectNameRegistration = cancelDirectNameRegistration;
 
     // Welcome Preview Dialog Logic
-    let welcomeInterval = null;
+    let welcomeIntervals = [];
 
-    function initWelcomePreview() {
+    async function initWelcomePreview() {
       const overlay = document.getElementById('welcomePreviewOverlay');
       if (!overlay) return;
 
-      const slide1 = document.getElementById('welcomeSlide1');
-      const slide2 = document.getElementById('welcomeSlide2');
-      const dot1 = document.getElementById('welcomeDot1');
-      const dot2 = document.getElementById('welcomeDot2');
+      const viewport = document.getElementById('welcomeSlideViewport');
+      const dotsContainer = document.getElementById('welcomeDotsContainer');
       const closeContainer = document.getElementById('welcomeCloseContainer');
 
-      // Start automatic transition to Slide 2 after 3 seconds
-      welcomeInterval = setTimeout(() => {
-        if (slide1) slide1.classList.replace('opacity-100', 'opacity-0');
-        if (slide2) slide2.classList.replace('opacity-0', 'opacity-100');
-        
-        if (dot1) dot1.className = "w-1.5 h-1.5 rounded-full bg-slate-700 transition-all duration-300";
-        if (dot2) dot2.className = "w-2.5 h-1.5 rounded-full bg-indigo-500 transition-all duration-300";
-        
-        // Wait another 3 seconds for Slide 2 to be shown, then reveal the close button
-        setTimeout(() => {
-          if (closeContainer) {
-            closeContainer.classList.remove('pointer-events-none');
-            closeContainer.classList.replace('opacity-0', 'opacity-100');
-            closeContainer.classList.replace('max-h-0', 'max-h-[80px]');
-          }
-        }, 3000);
+      // Clear any running timers
+      welcomeIntervals.forEach(clearTimeout);
+      welcomeIntervals = [];
 
-      }, 3000);
+      let activeSlides = [
+        { id: 'default1', url: '/images/punch_cover_photo.png' },
+        { id: 'default2', url: '/images/punch_cover_banner.png' }
+      ];
+
+      try {
+        const response = await fetch('/api/superadmin/settings');
+        if (response.ok) {
+          const settings = await response.json();
+          if (settings.promotionalImages && settings.promotionalImages.length > 0) {
+            const customActive = settings.promotionalImages.filter(img => img.active);
+            if (customActive.length > 0) {
+              activeSlides = customActive;
+            } else {
+              // If none are active, skip welcome preview
+              closeWelcomePreview();
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load dynamic slides, using defaults:', err);
+      }
+
+      // Render slides
+      viewport.innerHTML = '';
+      dotsContainer.innerHTML = '';
+
+      activeSlides.forEach((slide, idx) => {
+        const img = document.createElement('img');
+        img.id = `welcomeSlide-${idx}`;
+        img.src = slide.url;
+        img.alt = `Slide ${idx + 1}`;
+        img.className = `absolute w-full h-full object-contain transition-opacity duration-700 ${
+          idx === 0 ? 'opacity-100' : 'opacity-0'
+        }`;
+        viewport.appendChild(img);
+
+        const dot = document.createElement('div');
+        dot.id = `welcomeDot-${idx}`;
+        dot.className = `${
+          idx === 0 ? 'w-2.5 h-1.5 bg-indigo-500' : 'w-1.5 h-1.5 bg-slate-700'
+        } rounded-full transition-all duration-300`;
+        dotsContainer.appendChild(dot);
+      });
+
+      // Ensure close button is hidden on initial setup
+      if (closeContainer) {
+        closeContainer.classList.add('pointer-events-none');
+        closeContainer.classList.replace('opacity-100', 'opacity-0');
+        closeContainer.classList.replace('max-h-[80px]', 'max-h-0');
+      }
+
+      let currentIdx = 0;
+
+      function showNextSlide() {
+        if (activeSlides.length <= 1) {
+          // If only 1 slide, immediately show the close button after 3 seconds
+          const t = setTimeout(() => {
+            if (closeContainer) {
+              closeContainer.classList.remove('pointer-events-none');
+              closeContainer.classList.replace('opacity-0', 'opacity-100');
+              closeContainer.classList.replace('max-h-0', 'max-h-[80px]');
+            }
+          }, 3000);
+          welcomeIntervals.push(t);
+          return;
+        }
+
+        const nextIdx = (currentIdx + 1) % activeSlides.length;
+
+        const t = setTimeout(() => {
+          const currentImg = document.getElementById(`welcomeSlide-${currentIdx}`);
+          const nextImg = document.getElementById(`welcomeSlide-${nextIdx}`);
+          const currentDot = document.getElementById(`welcomeDot-${currentIdx}`);
+          const nextDot = document.getElementById(`welcomeDot-${nextIdx}`);
+
+          if (currentImg) currentImg.classList.replace('opacity-100', 'opacity-0');
+          if (nextImg) nextImg.classList.replace('opacity-0', 'opacity-100');
+
+          if (currentDot) currentDot.className = "w-1.5 h-1.5 rounded-full bg-slate-700 transition-all duration-300";
+          if (nextDot) nextDot.className = "w-2.5 h-1.5 rounded-full bg-indigo-500 transition-all duration-300";
+
+          currentIdx = nextIdx;
+
+          // If we reached the end of the first loop (or showing all slides), reveal the enter platform button
+          if (currentIdx === activeSlides.length - 1) {
+            const showBtnT = setTimeout(() => {
+              if (closeContainer) {
+                closeContainer.classList.remove('pointer-events-none');
+                closeContainer.classList.replace('opacity-0', 'opacity-100');
+                closeContainer.classList.replace('max-h-0', 'max-h-[80px]');
+              }
+            }, 3000);
+            welcomeIntervals.push(showBtnT);
+          }
+
+          showNextSlide();
+
+        }, 3000);
+        welcomeIntervals.push(t);
+      }
+
+      showNextSlide();
     }
 
     function closeWelcomePreview() {
@@ -1031,9 +1119,8 @@
           overlay.classList.add('hidden');
         }, 500);
       }
-      if (welcomeInterval) {
-        clearTimeout(welcomeInterval);
-      }
+      welcomeIntervals.forEach(clearTimeout);
+      welcomeIntervals = [];
     }
 
     window.closeWelcomePreview = closeWelcomePreview;

@@ -202,7 +202,24 @@ function mapSettingsRowToApp(row) {
     monthlyFee: row.monthly_fee ? parseFloat(row.monthly_fee) : 1250,
     monthlyPlanMonths: row.monthly_plan_months ? parseInt(row.monthly_plan_months) : 3,
     perStampFee: row.per_stamp_fee ? parseFloat(row.per_stamp_fee) : 1,
-    perStampDeveloperFee: row.per_stamp_developer_fee ? parseFloat(row.per_stamp_developer_fee) : 3000
+    perStampDeveloperFee: row.per_stamp_developer_fee ? parseFloat(row.per_stamp_developer_fee) : 3000,
+    promotionalImages: (() => {
+      if (!row.promotional_images) {
+        return [
+          { id: 'default1', url: '/images/punch_cover_photo.png', active: true },
+          { id: 'default2', url: '/images/punch_cover_banner.png', active: true }
+        ];
+      }
+      try {
+        return JSON.parse(row.promotional_images);
+      } catch (e) {
+        console.error('Error parsing promotional_images:', e);
+        return [
+          { id: 'default1', url: '/images/punch_cover_photo.png', active: true },
+          { id: 'default2', url: '/images/punch_cover_banner.png', active: true }
+        ];
+      }
+    })()
   };
 }
 
@@ -981,7 +998,7 @@ module.exports = {
     return mapSettingsRowToApp(settingsRow);
   },
 
-  async updateGlobalSettings({ paymentQr, paymentInstructions, subscriptionMethod, systemDeveloperFee, dailyFee, monthlyFee, monthlyPlanMonths, perStampDeveloperFee, perStampFee }) {
+  async updateGlobalSettings({ paymentQr, paymentInstructions, subscriptionMethod, systemDeveloperFee, dailyFee, monthlyFee, monthlyPlanMonths, perStampDeveloperFee, perStampFee, promotionalImages }) {
     const updates = {};
     if (paymentQr !== undefined) updates.payment_qr = paymentQr;
     if (paymentInstructions !== undefined) updates.payment_instructions = paymentInstructions;
@@ -992,6 +1009,9 @@ module.exports = {
     if (monthlyPlanMonths !== undefined) updates.monthly_plan_months = parseInt(monthlyPlanMonths) || 3;
     if (perStampDeveloperFee !== undefined) updates.per_stamp_developer_fee = parseFloat(perStampDeveloperFee) || 0;
     if (perStampFee !== undefined) updates.per_stamp_fee = parseFloat(perStampFee) || 0;
+    if (promotionalImages !== undefined) {
+      updates.promotional_images = typeof promotionalImages === 'string' ? promotionalImages : JSON.stringify(promotionalImages);
+    }
 
     const { error } = await supabase
       .from('global_settings')
@@ -1000,7 +1020,13 @@ module.exports = {
 
     if (error) {
       if (error.message.includes('column') || error.code === '42703') {
-        throw new Error("Database column 'monthly_plan_months' is missing. Please run the following SQL command in your Supabase SQL Editor first:\n\nALTER TABLE global_settings ADD COLUMN IF NOT EXISTS monthly_plan_months INT DEFAULT 3;");
+        const msg = error.message.toLowerCase();
+        if (msg.includes('promotional_images')) {
+          throw new Error("Database column 'promotional_images' is missing. Please run the following SQL command in your Supabase SQL Editor first:\n\nALTER TABLE global_settings ADD COLUMN IF NOT EXISTS promotional_images TEXT;");
+        } else if (msg.includes('monthly_plan_months')) {
+          throw new Error("Database column 'monthly_plan_months' is missing. Please run the following SQL command in your Supabase SQL Editor first:\n\nALTER TABLE global_settings ADD COLUMN IF NOT EXISTS monthly_plan_months INT DEFAULT 3;");
+        }
+        throw new Error("Database column configuration issue. Please ensure your schema matches the database requirements: " + error.message);
       }
       throw new Error(error.message);
     }

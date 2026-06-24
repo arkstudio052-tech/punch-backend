@@ -521,7 +521,8 @@ app.post('/api/superadmin/settings', requireSuperAdminAuth, async (req, res) => 
     monthlyFee, 
     monthlyPlanMonths,
     perStampDeveloperFee,
-    perStampFee 
+    perStampFee,
+    promotionalImages
   } = req.body;
   try {
     const settings = await db.updateGlobalSettings({ 
@@ -534,7 +535,8 @@ app.post('/api/superadmin/settings', requireSuperAdminAuth, async (req, res) => 
       monthlyFee, 
       monthlyPlanMonths,
       perStampDeveloperFee,
-      perStampFee 
+      perStampFee,
+      promotionalImages
     });
     res.json(settings);
   } catch (error) {

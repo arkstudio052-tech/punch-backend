@@ -477,6 +477,45 @@
             </button>
           </form>
         </div>
+
+        <!-- Promotional Banner Card -->
+        <div id="promotionalBannerCard" class="glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-4 glow-indigo max-w-2xl mx-auto w-full mt-6">
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <span>📢</span> Promotional Welcome Banner
+          </h3>
+          <p class="text-slate-400 text-xs leading-relaxed">
+            Manage the slideshow images shown on the landing page welcome dialog. Turn images on/off, delete them, or upload new promotional banners.
+          </p>
+
+          <!-- Upload Container -->
+          <div class="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3 relative">
+            <label class="bg-indigo-650/20 hover:bg-indigo-600/30 text-indigo-400 font-bold text-xs py-2.5 px-5 rounded-xl border border-indigo-500/20 cursor-pointer transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]">
+              <span>➕</span> Add Promotional Image
+              <input type="file" id="promoFileInput" accept="image/*" class="hidden">
+            </label>
+            <p class="text-[10px] text-slate-500">Supports PNG, JPG (Max 2MB). Recommends 16:9 vertical/contain aspect ratio.</p>
+          </div>
+
+          <!-- Promotional Images List Container -->
+          <div id="promoImagesList" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <!-- Dynamically populated promotional image cards -->
+          </div>
+
+          <div id="promoEmptyState" class="hidden text-center py-8 text-slate-500 text-xs">
+            No promotional images uploaded. Default cover and banner images will be shown instead.
+          </div>
+
+          <!-- Save Button -->
+          <div class="pt-2">
+            <button 
+              type="button"
+              onclick="savePromotionalSettings()"
+              class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider transition-colors shadow-md active:scale-[0.98]"
+            >
+              Save Promotional Settings
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   <!-- View Receipt Modal -->
@@ -597,6 +636,7 @@
     let paymentQrBase64 = null;
     let notificationsList = [];
     let paymentsList = [];
+    let promotionalImages = [];
 
     // Helper fetch with SuperAdmin Code in headers
     function fetchWithAuth(url, options = {}) {
@@ -651,6 +691,12 @@
             qrPreviewImg.classList.remove('hidden');
             qrFallbackEmoji.classList.add('hidden');
           }
+
+          promotionalImages = settings.promotionalImages || [
+            { id: 'default1', url: '/images/punch_cover_photo.png', active: true },
+            { id: 'default2', url: '/images/punch_cover_banner.png', active: true }
+          ];
+          renderPromotionalImages();
         }
 
         // Fetch registered shops
@@ -1382,6 +1428,154 @@
 
     window.scrollToCard = scrollToCard;
     window.switchTab = switchTab;
+
+    // Promotional Welcome Banner Logic
+    function renderPromotionalImages() {
+      const listContainer = document.getElementById('promoImagesList');
+      const emptyState = document.getElementById('promoEmptyState');
+      if (!listContainer) return;
+      
+      listContainer.innerHTML = '';
+      
+      if (!promotionalImages || promotionalImages.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+      
+      promotionalImages.forEach((img, index) => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-2 flex flex-col justify-between space-y-2 relative group';
+        
+        // Image thumbnail
+        const imgContainer = document.createElement('div');
+        imgContainer.className = 'w-full h-28 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-slate-905 relative';
+        
+        const preview = document.createElement('img');
+        preview.src = img.url;
+        preview.className = 'w-full h-full object-contain';
+        imgContainer.appendChild(preview);
+        
+        // Status indicator badge
+        const badge = document.createElement('span');
+        badge.className = `absolute top-1 left-1 px-1.5 py-0.5 rounded text-[8px] font-bold ${
+          img.active 
+            ? 'bg-emerald-500/80 text-white' 
+            : 'bg-slate-850/80 text-slate-400'
+        }`;
+        badge.textContent = img.active ? 'ACTIVE' : 'INACTIVE';
+        imgContainer.appendChild(badge);
+        
+        card.appendChild(imgContainer);
+        
+        // Control buttons
+        const controls = document.createElement('div');
+        controls.className = 'flex items-center justify-between w-full';
+        
+        // Active checkbox/toggle label
+        const label = document.createElement('label');
+        label.className = 'flex items-center gap-1 cursor-pointer select-none';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = img.active;
+        checkbox.className = 'rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer';
+        checkbox.addEventListener('change', () => {
+          img.active = checkbox.checked;
+          renderPromotionalImages();
+        });
+        
+        const labelText = document.createElement('span');
+        labelText.className = 'text-[10px] text-slate-300 font-bold';
+        labelText.textContent = 'Show';
+        
+        label.appendChild(checkbox);
+        label.appendChild(labelText);
+        controls.appendChild(label);
+        
+        // Delete button
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'text-rose-500 hover:text-rose-450 p-1 hover:bg-rose-500/10 rounded transition-all';
+        delBtn.title = 'Delete image';
+        delBtn.innerHTML = `
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+        `;
+        delBtn.addEventListener('click', () => {
+          if (confirm('Are you sure you want to delete this promotional image?')) {
+            promotionalImages.splice(index, 1);
+            renderPromotionalImages();
+          }
+        });
+        controls.appendChild(delBtn);
+        
+        card.appendChild(controls);
+        listContainer.appendChild(card);
+      });
+    }
+
+    // Set up promo file listener once element is parsed
+    setTimeout(() => {
+      const promoFileInput = document.getElementById('promoFileInput');
+      if (promoFileInput) {
+        promoFileInput.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          if (file.size > 2 * 1024 * 1024) {
+            alert('File size exceeds 2MB limit.');
+            e.target.value = '';
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64Url = reader.result;
+            const newImg = {
+              id: 'promo-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+              url: base64Url,
+              active: true
+            };
+            promotionalImages.push(newImg);
+            renderPromotionalImages();
+            e.target.value = '';
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    }, 100);
+
+    async function savePromotionalSettings() {
+      const activeCount = promotionalImages.filter(img => img.active).length;
+      if (activeCount === 0) {
+        if (!confirm('Warning: You have no active promotional images selected. The welcome dialog will not show any slides. Do you want to proceed?')) {
+          return;
+        }
+      }
+
+      try {
+        const response = await fetchWithAuth('/api/superadmin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            promotionalImages: promotionalImages
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to save promotional settings.');
+        }
+        alert('Promotional welcome banner settings updated successfully!');
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    window.savePromotionalSettings = savePromotionalSettings;
+    window.renderPromotionalImages = renderPromotionalImages;
 
     // Auto-refresh data and notifications every 5 seconds for live dashboard tracking
     setInterval(() => {

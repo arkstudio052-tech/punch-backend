@@ -1,4 +1,4 @@
-const CACHE_NAME = 'punch-loyalty-cache-v16';
+const CACHE_NAME = 'punch-loyalty-cache-v17';
 const ASSETS = [
   '/',
   '/index.html',
