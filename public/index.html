@@ -328,6 +328,59 @@
           <p class="text-[11px] text-slate-400 leading-normal mt-0.5">Scan store QR to view stamp cards, earn stamps, & redeem rewards.</p>
         </div>
       </button>
+
+      <!-- Direct Customer Login Form -->
+      <div class="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl text-left space-y-3.5 mt-4">
+        <div class="space-y-1">
+          <h3 class="text-xs font-bold text-white uppercase tracking-wider">Access Your Wallet</h3>
+          <p class="text-[10px] text-slate-400">Enter your phone number to log in and see your stamps directly.</p>
+        </div>
+        <form id="directLoginForm" onsubmit="handleDirectLogin(event)" class="space-y-3">
+          <div id="directPhoneGroup">
+            <div class="flex gap-2">
+              <input 
+                type="tel" 
+                id="directPhoneInput" 
+                placeholder="e.g. 09956242530" 
+                class="flex-grow bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-650 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-xs font-mono"
+                required
+              >
+              <button 
+                type="submit" 
+                class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4.5 py-2.5 rounded-xl text-xs uppercase tracking-wide cursor-pointer transition-all active:scale-[0.98] shrink-0"
+              >
+                Log In
+              </button>
+            </div>
+          </div>
+          
+          <div id="directNameGroup" class="hidden space-y-2 animate-fade-in">
+            <p class="text-[10px] text-indigo-400 font-bold">✨ First Time? Enter your name to register your wallet:</p>
+            <div class="flex gap-2">
+              <input 
+                type="text" 
+                id="directNameInput" 
+                placeholder="e.g. Rey Hunter" 
+                class="flex-grow bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-xs"
+              >
+              <button 
+                type="button" 
+                onclick="submitDirectNameRegistration()"
+                class="bg-indigo-650 hover:bg-indigo-550 text-white font-bold px-4 rounded-xl text-xs uppercase tracking-wide cursor-pointer transition-all active:scale-[0.98] shrink-0"
+              >
+                Continue
+              </button>
+              <button 
+                type="button" 
+                onclick="cancelDirectNameRegistration()"
+                class="bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 font-bold px-3 rounded-xl text-xs uppercase tracking-wide cursor-pointer transition-all shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
       
       <div class="pt-6 text-center space-y-3 border-t border-slate-900">
         <button onclick="toggleModal(true)" class="text-xs text-indigo-400 hover:text-indigo-300 hover:underline font-semibold bg-transparent border-0 cursor-pointer">
@@ -813,6 +866,57 @@
       }
     });
 
+    async function handleDirectLogin(e) {
+      e.preventDefault();
+      const phoneInput = document.getElementById('directPhoneInput');
+      const phone = phoneInput.value.trim();
+      if (!phone) return;
+
+      try {
+        const response = await fetch(`/api/global/profile/${encodeURIComponent(phone)}`);
+        if (!response.ok) throw new Error('Failed to fetch profile.');
+        const profileData = await response.json();
+
+        // If user already has a name registered, complete the login directly
+        if (profileData.name && profileData.name !== 'Loyalty Member') {
+          localStorage.setItem('punch_global_phone', phone);
+          localStorage.setItem('punch_global_name', profileData.name);
+          checkGlobalSession();
+          phoneInput.value = '';
+        } else {
+          // New user (or no memberships with name yet): ask for name
+          document.getElementById('directPhoneInput').readOnly = true;
+          document.getElementById('directNameGroup').classList.remove('hidden');
+          document.getElementById('directNameInput').focus();
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function submitDirectNameRegistration() {
+      const phone = document.getElementById('directPhoneInput').value.trim();
+      const nameInput = document.getElementById('directNameInput');
+      const name = nameInput.value.trim() || 'Loyalty Member';
+      
+      localStorage.setItem('punch_global_phone', phone);
+      localStorage.setItem('punch_global_name', name);
+      
+      // Clean up form inputs and hide name group
+      document.getElementById('directPhoneInput').value = '';
+      document.getElementById('directPhoneInput').readOnly = false;
+      nameInput.value = '';
+      document.getElementById('directNameGroup').classList.add('hidden');
+      
+      checkGlobalSession();
+    }
+
+    function cancelDirectNameRegistration() {
+      document.getElementById('directPhoneInput').readOnly = false;
+      document.getElementById('directNameInput').value = '';
+      document.getElementById('directNameGroup').classList.add('hidden');
+    }
+
     // Expose helpers globally
     window.toggleModal = toggleModal;
     window.startScanning = startScanning;
@@ -823,6 +927,9 @@
     window.startScanningFromProfile = startScanningFromProfile;
     window.enterSlugFromProfile = enterSlugFromProfile;
     window.accessMerchantFromProfile = accessMerchantFromProfile;
+    window.handleDirectLogin = handleDirectLogin;
+    window.submitDirectNameRegistration = submitDirectNameRegistration;
+    window.cancelDirectNameRegistration = cancelDirectNameRegistration;
 
     // Run session check on page load
     checkGlobalSession();
