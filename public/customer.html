@@ -396,6 +396,8 @@
         } else {
           // Existing user: direct login
           localStorage.setItem(`punch_customer_${shopSlug}`, data.customer.id);
+          localStorage.setItem('punch_global_phone', data.customer.phone);
+          localStorage.setItem('punch_global_name', data.customer.name || '');
           await loadCustomer(data.customer.id);
         }
       } catch (error) {
@@ -424,6 +426,8 @@
 
         const data = await response.json();
         localStorage.setItem(`punch_customer_${shopSlug}`, data.customer.id);
+        localStorage.setItem('punch_global_phone', data.customer.phone);
+        localStorage.setItem('punch_global_name', data.customer.name || '');
         await loadCustomer(data.customer.id);
       } catch (error) {
         alert(error.message);
@@ -452,6 +456,8 @@
         const data = await response.json();
         customerData = data.customer;
         shopData = data.shop;
+        localStorage.setItem('punch_global_phone', customerData.phone);
+        localStorage.setItem('punch_global_name', customerData.name || '');
 
         renderLoyaltyCard();
         showScreen(cardScreen);

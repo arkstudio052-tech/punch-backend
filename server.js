@@ -323,6 +323,16 @@ app.get('/api/customers/:customerId', async (req, res) => {
   }
 });
 
+// Fetch global customer profile with point totals across all stores
+app.get('/api/global/profile/:phone', async (req, res) => {
+  try {
+    const profile = await db.getGlobalProfile(req.params.phone);
+    res.json(profile);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Increment Customer points (Owner Auth Required)
 app.post('/api/customers/:customerId/add-point', requireOwnerAuth, checkShopSuspension, async (req, res) => {
   try {

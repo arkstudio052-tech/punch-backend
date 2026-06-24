@@ -797,6 +797,47 @@ module.exports = {
     }));
   },
 
+  async getGlobalProfile(phone) {
+    const cleanPhone = phone.trim().replace(/[^0-9+]/g, '');
+    const { data: customerRows, error: custErr } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('phone', cleanPhone);
+
+    if (custErr || !customerRows) return { name: '', phone: cleanPhone, memberships: [] };
+
+    let name = '';
+    const memberships = [];
+    
+    for (const row of customerRows) {
+      if (row.name && !name) {
+        name = row.name;
+      }
+      
+      const { data: shopRow } = await supabase
+        .from('shops')
+        .select('name, logo, rule')
+        .eq('id', row.shop_id)
+        .maybeSingle();
+
+      if (shopRow) {
+        memberships.push({
+          shopId: row.shop_id,
+          shopName: shopRow.name,
+          logo: shopRow.logo,
+          points: row.points || 0,
+          rule: shopRow.rule || '10 stamps = 1 free reward'
+        });
+      }
+    }
+
+    return {
+      name: name || 'Loyalty Member',
+      phone: cleanPhone,
+      memberships
+    };
+  },
+
   async getAllShopsFull() {
     const { data: shopRows, error } = await supabase
       .from('shops')

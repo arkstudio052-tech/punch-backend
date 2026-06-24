@@ -30,6 +30,8 @@
       };
     })();
   </script>
+  <!-- QR Code scanning engine -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body class="flex flex-col items-center justify-between p-6 md:p-12 min-h-screen bg-slate-950">
 
@@ -165,87 +167,185 @@
     </span>
   </header>
 
-  <main class="w-full max-w-5xl flex-grow grid md:grid-cols-2 gap-12 items-stretch my-auto">
-    
-    <!-- Hero / Intro (Left Column) -->
-    <div class="space-y-8 flex flex-col justify-center text-left">
-      <div class="space-y-4">
-        <h2 class="text-4xl md:text-5xl font-black leading-tight text-white tracking-tight">
-          Modern loyalty cards <br>
-          <span class="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">for local stores.</span>
-        </h2>
-        <p class="text-slate-400 text-base md:text-lg leading-relaxed">
-          Replace paper stamp cards with an interactive digital customer portal. No apps to install, no password friction. Just scanning QR codes.
-        </p>
+  <main class="w-full max-w-5xl flex-grow flex items-center justify-center my-auto px-4">
+    <!-- Global Customer Profile Dashboard (shown when customer phone is saved in localStorage) -->
+    <div id="globalProfileView" class="w-full max-w-md glass p-8 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo hidden animate-fade-in">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+      <!-- Welcome header & sign out -->
+      <div class="flex justify-between items-center border-b border-slate-900 pb-4 text-left">
+        <div>
+          <span class="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Customer Wallet</span>
+          <h2 id="globalMemberName" class="text-xl font-black text-white">Welcome back!</h2>
+        </div>
+        <button onclick="globalSignOut()" class="text-[10px] font-bold text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer">
+          Sign Out
+        </button>
       </div>
-      
-      <!-- Key Features -->
-      <div class="space-y-3">
-        <div class="flex items-center gap-3">
-          <div class="p-1 rounded-full bg-indigo-500/15 text-indigo-400">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-          </div>
-          <span class="text-slate-300 font-medium text-sm">Dynamic Custom Store Portals</span>
-        </div>
-        <div class="flex items-center gap-3">
-          <div class="p-1 rounded-full bg-indigo-500/15 text-indigo-400">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-          </div>
-          <span class="text-slate-300 font-medium text-sm">Welcome stamp automatically awarded</span>
-        </div>
-        <div class="flex items-center gap-3">
-          <div class="p-1 rounded-full bg-indigo-500/15 text-indigo-400">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-          </div>
-          <span class="text-slate-300 font-medium text-sm">Secure manager & cashier access gate</span>
+
+      <!-- Point aggregation summary -->
+      <div class="bg-indigo-600/10 border border-indigo-500/20 rounded-2xl p-5 shadow-inner">
+        <span class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Total Stamps Collected</span>
+        <div id="globalTotalPoints" class="text-4xl font-extrabold text-white tracking-tight">
+          0 <span class="text-indigo-400 text-sm font-semibold tracking-normal uppercase">Stamps</span>
         </div>
       </div>
 
-      <div class="pt-4">
-        <button 
-          onclick="toggleModal(true)"
-          class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 px-8 rounded-2xl shadow-xl transition-all hover:scale-[1.02] text-sm tracking-wide uppercase active:scale-[0.98] glow-indigo shrink-0"
-        >
-          ✨ Register your Shop
+      <!-- Tab Buttons for Wallet directory vs Switch to Manager -->
+      <div class="flex bg-slate-950/80 border border-slate-800 p-1 rounded-xl">
+        <button id="profileTabBtn-cards" onclick="switchProfileTab('cards')" class="flex-1 text-xs font-bold py-2 rounded-lg transition-all text-white bg-indigo-650/30 border-0 cursor-pointer shadow-sm">
+          🎟️ My Cards
+        </button>
+        <button id="profileTabBtn-merchant" onclick="switchProfileTab('merchant')" class="flex-1 text-xs font-bold py-2 rounded-lg transition-all text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer">
+          🏪 Switch to Merchant
+        </button>
+      </div>
+
+      <!-- Tab Content 1: My Loyalty Cards list -->
+      <div id="profileTabContent-cards" class="space-y-3 max-h-[14rem] overflow-y-auto pr-1">
+        <div id="membershipsList" class="space-y-2.5">
+          <!-- Dynamically populated customer loyalty cards -->
+          <div class="text-center py-8 text-slate-550 text-xs">
+            Loading stamp cards...
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Merchant Portal information -->
+      <div id="profileTabContent-merchant" class="hidden space-y-4 text-left animate-fade-in p-1">
+        <p class="text-xs text-slate-450 leading-relaxed">
+          Are you a store manager or cashier? Access your cashier scanner tools to award loyalty stamps or verify rewards claims.
+        </p>
+        <button onclick="accessMerchantFromProfile()" class="w-full bg-slate-900 hover:bg-slate-850 text-white font-bold py-3 px-4 rounded-xl text-xs border border-slate-800 transition-all text-center cursor-pointer flex items-center justify-center gap-1.5">
+          🔐 Access Cashier Dashboard
+        </button>
+      </div>
+
+      <!-- Scan QR / Enter slug action button -->
+      <div class="pt-4 border-t border-slate-900 flex gap-3">
+        <button onclick="startScanningFromProfile('customer')" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md text-xs uppercase tracking-wide cursor-pointer flex items-center justify-center gap-1.5">
+          📷 Scan Store QR
+        </button>
+        <button onclick="enterSlugFromProfile('customer')" class="flex-1 bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-850 font-bold py-3.5 px-4 rounded-xl transition-all text-xs uppercase tracking-wide cursor-pointer text-center">
+          ✏️ Type Store Slug
         </button>
       </div>
     </div>
 
-    <!-- Shop Directory Card (Right Column) -->
-    <div class="glass p-8 rounded-3xl border border-indigo-500/10 space-y-6 glow-indigo flex flex-col justify-between">
+    <!-- Role Selection Screen -->
+    <div id="roleSelectionView" class="w-full max-w-md glass p-8 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo animate-fade-in">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+      <div class="space-y-1.5 mb-8">
+        <h2 class="text-2xl font-black text-white tracking-tight">Choose Your Portal</h2>
+        <p class="text-xs text-slate-400">Scan a shop QR code to login or access dashboards.</p>
+      </div>
+
+      <!-- Owner Button/Card -->
+      <button onclick="startScanning('owner')" class="w-full bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-indigo-500/30 p-5 rounded-2xl transition-all text-left flex items-center gap-4 group hover:scale-[1.01] active:scale-[0.99] cursor-pointer">
+        <div class="w-12 h-12 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-2xl group-hover:bg-indigo-650/20 group-hover:scale-105 transition-all shrink-0">
+          🔐
+        </div>
+        <div class="min-w-0 flex-grow">
+          <h3 class="text-base font-bold text-white group-hover:text-indigo-400 transition-colors">Store Manager</h3>
+          <p class="text-[11px] text-slate-400 leading-normal mt-0.5">Scan store QR to access owner dashboard & cashier console.</p>
+        </div>
+      </button>
+
+      <!-- Customer Button/Card -->
+      <button onclick="startScanning('customer')" class="w-full bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-indigo-500/30 p-5 rounded-2xl transition-all text-left flex items-center gap-4 group hover:scale-[1.01] active:scale-[0.99] cursor-pointer">
+        <div class="w-12 h-12 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-2xl group-hover:bg-indigo-650/20 group-hover:scale-105 transition-all shrink-0">
+          🎟️
+        </div>
+        <div class="min-w-0 flex-grow">
+          <h3 class="text-base font-bold text-white group-hover:text-indigo-400 transition-colors">Loyalty Customer</h3>
+          <p class="text-[11px] text-slate-400 leading-normal mt-0.5">Scan store QR to view stamp cards, earn stamps, & redeem rewards.</p>
+        </div>
+      </button>
+      
+      <div class="pt-6 text-center space-y-3 border-t border-slate-900">
+        <button onclick="toggleModal(true)" class="text-xs text-indigo-400 hover:text-indigo-300 hover:underline font-semibold bg-transparent border-0 cursor-pointer">
+          ✨ Store Onboarding: Register a New Shop
+        </button>
+        <div class="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+          Demo Slugs: <span class="text-indigo-400/80 font-mono">coffee-shop</span> | <span class="text-indigo-400/80 font-mono">laundry-shop</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Portal Access View (with QR scanning and Manual Slug Entry tabs) -->
+    <div id="scannerView" class="w-full max-w-md hidden glass p-8 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo animate-fade-in">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
       <div class="space-y-1">
-        <h3 class="text-xl font-bold text-white flex items-center gap-2">
-          <span>🏪</span> Registered Stores
-        </h3>
-        <p class="text-slate-400 text-xs leading-normal">
-          Explore registered local shops. Click any store to join or view your active stamp points.
-        </p>
+        <h2 id="portalTitle" class="text-2xl font-black text-white tracking-tight">Access Portal</h2>
+        <p id="scannerSubtitle" class="text-xs text-slate-400 font-medium">Scanning as Loyalty Customer...</p>
       </div>
 
-      <!-- Shop List Directory -->
-      <div id="shopDirectoryList" class="space-y-3 max-h-[16rem] md:max-h-[20rem] overflow-y-auto pr-1 flex-grow mt-4">
-        <div class="text-center py-12 text-slate-500 text-sm">
-          Loading directory...
+      <!-- Tab Buttons -->
+      <div class="flex bg-slate-950/80 border border-slate-800 p-1 rounded-xl">
+        <button id="tabBtn-scan" onclick="switchScannerTab('scan')" class="flex-1 text-xs font-bold py-2 rounded-lg transition-all text-white bg-indigo-650/30 border-0 cursor-pointer shadow-sm">
+          📷 Scan QR Code
+        </button>
+        <button id="tabBtn-manual" onclick="switchScannerTab('manual')" class="flex-1 text-xs font-bold py-2 rounded-lg transition-all text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer">
+          ✏️ Enter Handle
+        </button>
+      </div>
+
+      <!-- Tab Content 1: Scan QR -->
+      <div id="tabContent-scan" class="space-y-6">
+        <!-- Scanner Viewport Frame -->
+        <div class="relative w-full aspect-square max-w-xs mx-auto rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/80 flex flex-col items-center justify-center p-1 glow-indigo">
+          <!-- Camera Feed Element for html5-qrcode -->
+          <div id="reader" class="w-full h-full object-cover"></div>
+          
+          <!-- Overlay Scanner Lines -->
+          <div class="absolute inset-0 pointer-events-none border-2 border-indigo-500/10 rounded-2xl"></div>
+          <div class="absolute left-6 right-6 h-0.5 bg-indigo-500 shadow-md shadow-indigo-500/50 animate-scanner-laser pointer-events-none opacity-40"></div>
+        </div>
+
+        <!-- File Selector Dropdown Fallback -->
+        <div class="bg-slate-900/40 border border-slate-800 p-4 rounded-xl space-y-2 text-left max-w-xs mx-auto w-full">
+          <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider text-center">Camera issue? Upload QR Image instead</label>
+          <input type="file" id="qrFileInput" accept="image/*" class="block w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-650/20 file:text-indigo-400 hover:file:bg-indigo-650/30 file:transition-all cursor-pointer">
         </div>
       </div>
 
-      <!-- Demo Section at Bottom -->
-      <div class="border-t border-slate-900 pt-4">
-        <h4 class="text-[10px] font-bold tracking-wider text-slate-500 uppercase mb-2">Or Quick-Launch Demos</h4>
-        <div class="flex gap-2.5">
+      <!-- Tab Content 2: Manual Handle Entry -->
+      <div id="tabContent-manual" class="hidden space-y-6 animate-fade-in">
+        <form id="manualSlugForm" onsubmit="handleManualSlugSubmit(event)" class="space-y-4 max-w-xs mx-auto w-full text-left">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2" for="manualSlugInput">Store Handle / Slug</label>
+            <div class="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-4 focus-within:ring-2 focus-within:ring-indigo-500/50 focus-within:border-indigo-500 transition-all">
+              <span class="text-slate-500 text-sm font-mono select-none pr-1">/</span>
+              <input 
+                type="text" 
+                id="manualSlugInput" 
+                placeholder="e.g. barber-shop" 
+                class="w-full bg-transparent py-3 text-white placeholder-slate-650 focus:outline-none font-mono text-sm"
+                required
+              >
+            </div>
+            <p class="text-[9px] text-slate-500 mt-1 leading-normal">Type the unique store slug identifier (e.g. "coffee-shop" or "barber-shop").</p>
+          </div>
+
           <button 
-            onclick="quickLaunch('Coffee Shop', 'coffee-shop', '10 stamps = 1 free coffee')" 
-            class="flex-1 bg-slate-900 hover:bg-slate-850 text-slate-300 text-[11px] font-semibold py-2 px-3 rounded-xl border border-slate-800 transition-all flex items-center justify-center gap-1.5"
+            type="submit" 
+            class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-md shadow-indigo-600/20 text-xs uppercase tracking-wide cursor-pointer active:scale-[0.98]"
           >
-            <span>☕</span> Coffee Shop
+            Access Portal →
           </button>
-          <button 
-            onclick="quickLaunch('Laundry Shop', 'laundry-shop', '8 stamps = 1 free wash & dry')" 
-            class="flex-1 bg-slate-900 hover:bg-slate-850 text-slate-300 text-[11px] font-semibold py-2 px-3 rounded-xl border border-slate-800 transition-all flex items-center justify-center gap-1.5"
-          >
-            <span>🧺</span> Laundry Shop
-          </button>
-        </div>
+        </form>
+      </div>
+
+      <!-- Go Back Button (Visible for both tabs) -->
+      <div class="max-w-xs mx-auto w-full pt-2">
+        <button onclick="stopScanning()" class="w-full bg-slate-900 hover:bg-slate-850 text-slate-350 font-bold py-3 px-6 rounded-xl text-xs transition-all border border-slate-800 flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer">
+          ← Back to Selection
+        </button>
       </div>
     </div>
   </main>
@@ -275,59 +375,6 @@
         form.reset();
       } else {
         registerModal.classList.add('hidden');
-      }
-    }
-
-    // Load registered shops list
-    async function loadShops() {
-      try {
-        const response = await fetch('/api/shops');
-        if (!response.ok) throw new Error('Failed to load shop directory.');
-        const shops = await response.json();
-        
-        const shopDirectoryList = document.getElementById('shopDirectoryList');
-        shopDirectoryList.innerHTML = '';
-        
-        if (shops.length === 0) {
-          shopDirectoryList.innerHTML = `
-            <div class="text-center py-12 text-slate-500 text-xs space-y-2">
-              <span class="text-3xl block">🏪</span>
-              <p class="font-bold">No stores registered yet.</p>
-              <p class="text-slate-650">Register your shop to be listed here!</p>
-            </div>
-          `;
-          return;
-        }
-
-        // Render each shop
-        shops.forEach(shop => {
-          const item = document.createElement('div');
-          item.innerHTML = `
-            <a href="/${shop.id}" class="flex items-center gap-4 p-3 bg-slate-900/40 hover:bg-slate-900/70 border border-slate-900/80 hover:border-indigo-500/20 rounded-2xl transition-all group">
-              <div class="w-12 h-12 rounded-xl bg-slate-950 border border-slate-850 flex items-center justify-center overflow-hidden shrink-0">
-                ${shop.logo ? 
-                  `<img src="${shop.logo}" alt="${shop.name}" class="w-full h-full object-cover">` : 
-                  `<span class="text-2xl group-hover:scale-110 transition-transform">🏪</span>`
-                }
-              </div>
-              <div class="flex-grow min-w-0 text-left">
-                <div class="text-white font-bold text-sm truncate group-hover:text-indigo-400 transition-colors">${shop.name}</div>
-                <div class="text-slate-500 text-xs truncate mt-0.5 font-mono">punch.app/${shop.id}</div>
-              </div>
-              <div class="text-indigo-400 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0 pr-1 text-sm font-black shrink-0">
-                →
-              </div>
-            </a>
-          `;
-          shopDirectoryList.appendChild(item.firstElementChild);
-        });
-      } catch (err) {
-        console.error(err);
-        document.getElementById('shopDirectoryList').innerHTML = `
-          <div class="text-center py-12 text-rose-500 text-xs font-bold">
-            Failed to load shop directory.
-          </div>
-        `;
       }
     }
 
@@ -376,29 +423,6 @@
       }
     });
 
-    async function quickLaunch(name, slug, rule) {
-      try {
-        const response = await fetch('/api/shops', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            name, 
-            slug, 
-            rule, 
-            ownerUsername: 'admin', 
-            ownerPassword: 'admin' 
-          })
-        });
-        
-        displayResult(slug, 'admin', 'admin');
-        registerModal.classList.remove('hidden'); // Open modal showing links
-      } catch (error) {
-        // If already exists, just display links
-        displayResult(slug, 'admin', 'admin');
-        registerModal.classList.remove('hidden');
-      }
-    }
-
     function displayResult(slug, user = 'admin', pass = 'admin') {
       const origin = window.location.origin;
       customerLink.href = `${origin}/${slug}`;
@@ -411,17 +435,297 @@
 
       form.classList.add('hidden');
       resultBox.classList.remove('hidden');
-      
-      // Refresh directory
-      loadShops();
     }
 
-    // Expose helpers
-    window.toggleModal = toggleModal;
-    window.quickLaunch = quickLaunch;
+    // Global session dashboard checking and loading
+    function checkGlobalSession() {
+      const phone = localStorage.getItem('punch_global_phone');
+      const name = localStorage.getItem('punch_global_name') || 'Loyalty Member';
+      
+      const roleSelectionView = document.getElementById('roleSelectionView');
+      const scannerView = document.getElementById('scannerView');
+      const globalProfileView = document.getElementById('globalProfileView');
+      
+      if (phone) {
+        roleSelectionView.classList.add('hidden');
+        scannerView.classList.add('hidden');
+        globalProfileView.classList.remove('hidden');
+        
+        document.getElementById('globalMemberName').textContent = `Welcome, ${name}!`;
+        loadGlobalProfile(phone);
+      } else {
+        globalProfileView.classList.add('hidden');
+        scannerView.classList.add('hidden');
+        roleSelectionView.classList.remove('hidden');
+      }
+    }
 
-    // Load registered stores on page load
-    loadShops();
+    async function loadGlobalProfile(phone) {
+      const membershipsList = document.getElementById('membershipsList');
+      const globalTotalPoints = document.getElementById('globalTotalPoints');
+      
+      try {
+        const response = await fetch(`/api/global/profile/${encodeURIComponent(phone)}`);
+        if (!response.ok) throw new Error('Failed to fetch profile info.');
+        const profileData = await response.json();
+        
+        // Sum total points
+        let total = 0;
+        profileData.memberships.forEach(m => total += m.points || 0);
+        globalTotalPoints.innerHTML = `${total} <span class="text-indigo-400 text-sm font-semibold tracking-normal uppercase">Stamp${total === 1 ? '' : 's'}</span>`;
+        
+        // Render memberships card list
+        if (profileData.memberships.length === 0) {
+          membershipsList.innerHTML = `
+            <div class="text-center py-8 text-slate-500 text-xs space-y-2">
+              <span class="text-3xl block">🎟️</span>
+              <p class="font-bold">No loyalty cards added yet.</p>
+              <p class="text-slate-650 max-w-[220px] mx-auto leading-relaxed">Scan a store QR code or type a store handle below to get your first loyalty stamps!</p>
+            </div>
+          `;
+          return;
+        }
+
+        membershipsList.innerHTML = profileData.memberships.map(m => `
+          <a href="/${m.shopId}" class="flex items-center justify-between p-3.5 bg-slate-900/40 hover:bg-slate-900/80 border border-slate-900 hover:border-indigo-500/20 rounded-xl transition-all group cursor-pointer decoration-none">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-lg bg-slate-950 border border-slate-850 flex items-center justify-center overflow-hidden shrink-0">
+                ${m.logo ? `<img src="${m.logo}" alt="${m.shopName}" class="w-full h-full object-cover">` : `<span class="text-xl">🏪</span>`}
+              </div>
+              <div class="text-left min-w-0">
+                <span class="text-white font-bold text-xs block truncate group-hover:text-indigo-400 transition-colors">${m.shopName}</span>
+                <span class="text-[9px] text-slate-500 font-medium block truncate">${m.rule}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold font-mono text-xs px-2 py-0.5 rounded-full">
+                ${m.points} Stamp${m.points === 1 ? '' : 's'}
+              </span>
+              <span class="text-indigo-400 opacity-0 group-hover:opacity-100 transition-all translate-x-1 group-hover:translate-x-0 font-bold text-xs">→</span>
+            </div>
+          </a>
+        `).join('');
+      } catch (err) {
+        console.error(err);
+        membershipsList.innerHTML = `
+          <div class="text-center py-6 text-rose-500 text-xs font-bold">
+            Failed to load loyalty cards.
+          </div>
+        `;
+      }
+    }
+
+    function globalSignOut() {
+      localStorage.removeItem('punch_global_phone');
+      localStorage.removeItem('punch_global_name');
+      checkGlobalSession();
+    }
+
+    function switchProfileTab(tab) {
+      const cardsBtn = document.getElementById('profileTabBtn-cards');
+      const merchantBtn = document.getElementById('profileTabBtn-merchant');
+      const cardsContent = document.getElementById('profileTabContent-cards');
+      const merchantContent = document.getElementById('profileTabContent-merchant');
+
+      if (tab === 'cards') {
+        cardsBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-white bg-indigo-650/30 border-0 cursor-pointer shadow-sm';
+        merchantBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer';
+        cardsContent.classList.remove('hidden');
+        merchantContent.classList.add('hidden');
+      } else {
+        merchantBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-white bg-indigo-650/30 border-0 cursor-pointer shadow-sm';
+        cardsBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer';
+        cardsContent.classList.add('hidden');
+        merchantContent.classList.remove('hidden');
+      }
+    }
+
+    function startScanningFromProfile(role) {
+      document.getElementById('globalProfileView').classList.add('hidden');
+      startScanning(role);
+    }
+
+    function enterSlugFromProfile(role) {
+      document.getElementById('globalProfileView').classList.add('hidden');
+      startScanning(role);
+      switchScannerTab('manual');
+    }
+
+    function accessMerchantFromProfile() {
+      document.getElementById('globalProfileView').classList.add('hidden');
+      startScanning('owner');
+    }
+
+    // QR Code Scanner & Manual Slug Switcher Integration
+    let html5QrCode = null;
+    let currentRole = 'customer';
+
+    async function startScanning(role) {
+      currentRole = role;
+      document.getElementById('roleSelectionView').classList.add('hidden');
+      document.getElementById('scannerView').classList.remove('hidden');
+      document.getElementById('scannerSubtitle').textContent = role === 'owner' 
+        ? 'Scanning to access store dashboard & manager console...' 
+        : 'Scanning to open loyalty card & see points...';
+
+      // Reset to Scan QR tab by default
+      switchScannerTab('scan');
+    }
+
+    async function stopScanning() {
+      await stopCameraEngineOnly();
+      document.getElementById('scannerView').classList.add('hidden');
+      
+      const savedPhone = localStorage.getItem('punch_global_phone');
+      if (savedPhone) {
+        document.getElementById('globalProfileView').classList.remove('hidden');
+      } else {
+        document.getElementById('roleSelectionView').classList.remove('hidden');
+      }
+      document.getElementById('manualSlugInput').value = '';
+    }
+
+    async function startCameraEngine() {
+      try {
+        html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        
+        await html5QrCode.start(
+          { facingMode: "environment" }, 
+          config,
+          (decodedText) => {
+            stopScanning();
+            parseScannedText(decodedText, currentRole);
+          },
+          () => {
+            // Silently ignore scanner warnings
+          }
+        );
+      } catch (err) {
+        console.warn("Camera start failed, falling back to file input mode:", err);
+        const readerDiv = document.getElementById('reader');
+        readerDiv.innerHTML = `
+          <div class="text-center p-6 text-slate-400 space-y-3 flex flex-col items-center justify-center h-full">
+            <span class="text-3xl block animate-pulse">📷</span>
+            <p class="text-xs font-bold text-white">Camera Unavailable</p>
+            <p class="text-[10px] text-slate-550 leading-relaxed max-w-[200px]">Feed blocked or not supported. Please upload a QR code image below.</p>
+          </div>
+        `;
+      }
+    }
+
+    async function stopCameraEngineOnly() {
+      if (html5QrCode && html5QrCode.isScanning) {
+        try {
+          await html5QrCode.stop();
+        } catch (e) {
+          console.error("Failed to stop scanning:", e);
+        }
+      }
+      html5QrCode = null;
+      document.getElementById('reader').innerHTML = '';
+    }
+
+    function switchScannerTab(tab) {
+      const scanBtn = document.getElementById('tabBtn-scan');
+      const manualBtn = document.getElementById('tabBtn-manual');
+      const scanContent = document.getElementById('tabContent-scan');
+      const manualContent = document.getElementById('tabContent-manual');
+
+      if (tab === 'scan') {
+        scanBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-white bg-indigo-650/30 border-0 cursor-pointer shadow-sm';
+        manualBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer';
+        scanContent.classList.remove('hidden');
+        manualContent.classList.add('hidden');
+        
+        if (!html5QrCode || !html5QrCode.isScanning) {
+          startCameraEngine();
+        }
+      } else {
+        manualBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-white bg-indigo-650/30 border-0 cursor-pointer shadow-sm';
+        scanBtn.className = 'flex-1 text-xs font-bold py-2 rounded-lg transition-all text-slate-400 hover:text-white bg-transparent border-0 cursor-pointer';
+        scanContent.classList.add('hidden');
+        manualContent.classList.remove('hidden');
+
+        stopCameraEngineOnly();
+      }
+    }
+
+    function parseScannedText(text, role) {
+      let slug = '';
+      
+      if (text.startsWith('http://') || text.startsWith('https://')) {
+        try {
+          const url = new URL(text);
+          const pathParts = url.pathname.split('/').filter(Boolean);
+          if (pathParts.length > 0) {
+            slug = pathParts[0];
+          }
+        } catch (e) {
+          console.error('Failed to parse URL path:', e);
+        }
+      } else {
+        slug = text.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
+      }
+
+      if (!slug) {
+        alert('Could not find a valid store handle in the scanned code.');
+        return;
+      }
+
+      if (role === 'owner') {
+        window.location.href = `/${slug}/owner`;
+      } else {
+        window.location.href = `/${slug}`;
+      }
+    }
+
+    function handleManualSlugSubmit(e) {
+      e.preventDefault();
+      const rawInput = document.getElementById('manualSlugInput').value.trim();
+      const slug = rawInput.replace(/^\/+/, '').toLowerCase().replace(/[^a-z0-9-_]/g, '');
+      
+      if (!slug) {
+        alert('Please enter a valid store handle.');
+        return;
+      }
+
+      if (currentRole === 'owner') {
+        window.location.href = `/${slug}/owner`;
+      } else {
+        window.location.href = `/${slug}`;
+      }
+    }
+
+    // File input QR code handler
+    document.getElementById('qrFileInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const tempScanner = new Html5Qrcode("reader");
+      try {
+        const decodedText = await tempScanner.scanFile(file, true);
+        stopScanning();
+        parseScannedText(decodedText, currentRole);
+      } catch (err) {
+        alert("No valid QR code was detected in the uploaded image. Please try another file.");
+      }
+    });
+
+    // Expose helpers globally
+    window.toggleModal = toggleModal;
+    window.startScanning = startScanning;
+    window.stopScanning = stopScanning;
+    window.switchScannerTab = switchScannerTab;
+    window.handleManualSlugSubmit = handleManualSlugSubmit;
+    window.globalSignOut = globalSignOut;
+    window.switchProfileTab = switchProfileTab;
+    window.startScanningFromProfile = startScanningFromProfile;
+    window.enterSlugFromProfile = enterSlugFromProfile;
+    window.accessMerchantFromProfile = accessMerchantFromProfile;
+
+    // Run session check on page load
+    checkGlobalSession();
   </script>
 </body>
 </html>
