@@ -615,7 +615,7 @@
             <!-- Progress indicator -->
             <div class="space-y-2">
               <div class="flex justify-between text-xs font-semibold text-slate-350">
-                <span>Trial Countdown</span>
+                <span id="trialStatusLabel">Trial Countdown</span>
                 <span id="trialDaysLeftText" class="font-mono text-indigo-400">6 / 7 Days Remaining</span>
               </div>
               <!-- Progress bar track -->
@@ -1266,6 +1266,13 @@
       });
     }
 
+    function formatDateShort(date) {
+      if (!date) return '';
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '';
+      return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+    }
+
     function renderBillingDetails(billingSummary) {
       if (!billingSummary) return;
       
@@ -1377,6 +1384,7 @@
       const trialStatusTitle = document.querySelector('#trialStatusCard h3');
       const trialStatusText = document.querySelector('#trialStatusCard p');
       const trialStatusBtn = document.querySelector('#trialStatusCard button');
+      const trialStatusLabel = document.getElementById('trialStatusLabel');
       const trialDaysLeftText = document.getElementById('trialDaysLeftText');
       const trialProgressBar = document.getElementById('trialProgressBar');
 
@@ -1388,6 +1396,7 @@
         if (planMethod === 'onetime_daily') planLabel = 'Daily Plan';
         if (planMethod === 'per_stamp') planLabel = 'Pay-Per-Stamp';
         
+        if (trialStatusLabel) trialStatusLabel.textContent = `Subscription Status`;
         if (trialDaysLeftText) trialDaysLeftText.textContent = `Awaiting Admin Verification`;
         if (trialProgressBar) {
           trialProgressBar.style.width = `100%`;
@@ -1407,6 +1416,7 @@
           trialStatusBtn.className = "bg-slate-800 text-slate-400 font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs cursor-not-allowed";
         }
       } else if (method === 'trial') {
+        if (trialStatusLabel) trialStatusLabel.textContent = `Trial Countdown`;
         if (trialStatusBtn) {
           trialStatusBtn.removeAttribute('disabled');
           trialStatusBtn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs";
@@ -1430,10 +1440,7 @@
         if (trialStatusTitle) trialStatusTitle.innerHTML = `<span>🎁</span> Free Trial Active`;
         if (trialStatusText) trialStatusText.textContent = `Your store loyalty portal is currently on the 7-day free trial. You have full access to all features to test the system before starting a paid subscription.`;
       } else if (method === 'monthly') {
-        if (trialStatusBtn) {
-          trialStatusBtn.removeAttribute('disabled');
-          trialStatusBtn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs";
-        }
+        if (trialStatusLabel) trialStatusLabel.textContent = `Subscription Countdown`;
         if (trialStatusCard) {
           trialStatusCard.className = "glass p-4 sm:p-6 rounded-2xl border border-indigo-500/10 space-y-5 glow-indigo hidden text-left w-full max-w-full overflow-hidden";
         }
@@ -1444,7 +1451,8 @@
         const isExpired = billingSummary.isExpired;
         const expirationDate = new Date(billingSummary.expirationDate);
         const diffDays = billingSummary.diffDays || 0;
-        const totalDays = (billingSummary.monthlyPlanMonths || 3) * 30; // approximate total days in term
+        const subStartDate = billingSummary.subscriptionStartDate ? new Date(billingSummary.subscriptionStartDate) : new Date(shop.createdAt);
+        const totalDays = Math.max(1, Math.ceil((expirationDate.getTime() - subStartDate.getTime()) / (1000 * 60 * 60 * 24)));
         const remainingDays = Math.max(0, diffDays);
         
         if (isExpired) {
@@ -1454,6 +1462,8 @@
           if (trialStatusTitle) trialStatusTitle.innerHTML = `<span>⚠️</span> Subscription Expired`;
           if (trialStatusText) trialStatusText.textContent = `Your Flat Rate subscription has expired. Please settle the outstanding balance to reactivate cashier stamp and redemption features.`;
           if (trialStatusBtn) {
+            trialStatusBtn.removeAttribute('disabled');
+            trialStatusBtn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs";
             trialStatusBtn.innerHTML = `🔄 Settle Balance & Renew`;
             trialStatusBtn.classList.remove('hidden');
           }
@@ -1467,12 +1477,24 @@
           if (trialStatusCard) trialStatusCard.classList.remove('hidden');
           if (trialStatusTitle) trialStatusTitle.innerHTML = `<span>🚀</span> Flat Rate Subscription Active`;
           if (trialStatusText) trialStatusText.textContent = `Your store is currently subscribed to the Flat Rate plan. Your subscription is active and in good standing until ${formatDateShort(expirationDate)}.`;
+          
           if (trialStatusBtn) {
-            trialStatusBtn.innerHTML = `🔄 Extend Subscription`;
             trialStatusBtn.classList.remove('hidden');
+            if (billingSummary.isNearExpiration) {
+              trialStatusBtn.removeAttribute('disabled');
+              trialStatusBtn.innerHTML = `🔄 Renew Subscription`;
+              trialStatusBtn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs";
+              trialStatusBtn.removeAttribute('title');
+            } else {
+              trialStatusBtn.setAttribute('disabled', 'true');
+              trialStatusBtn.innerHTML = `Renew`;
+              trialStatusBtn.className = "bg-slate-800 text-slate-400 font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs cursor-not-allowed";
+              trialStatusBtn.setAttribute('title', 'Renewal is only available within 7 days of expiration.');
+            }
           }
         }
       } else {
+        if (trialStatusLabel) trialStatusLabel.textContent = `Subscription Countdown`;
         if (trialStatusBtn) {
           trialStatusBtn.removeAttribute('disabled');
           trialStatusBtn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-xs";
