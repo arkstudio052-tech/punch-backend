@@ -199,7 +199,8 @@ function mapSettingsRowToApp(row) {
     systemDeveloperFee: row.system_developer_fee ? parseFloat(row.system_developer_fee) : 5000,
     onetimeSetupFee: row.system_developer_fee ? parseFloat(row.system_developer_fee) : 5000,
     dailyFee: row.daily_fee ? parseFloat(row.daily_fee) : 50,
-    monthlyFee: row.monthly_fee ? parseFloat(row.monthly_fee) : 1500,
+    monthlyFee: row.monthly_fee ? parseFloat(row.monthly_fee) : 1250,
+    monthlyPlanMonths: row.monthly_plan_months ? parseInt(row.monthly_plan_months) : 3,
     perStampFee: row.per_stamp_fee ? parseFloat(row.per_stamp_fee) : 1,
     perStampDeveloperFee: row.per_stamp_developer_fee ? parseFloat(row.per_stamp_developer_fee) : 3000
   };
@@ -872,9 +873,15 @@ module.exports = {
       throw new Error(`Invalid subscription plan method: ${method}`);
     }
 
+    const shop = await this.getShop(cleanSlug);
+    const updates = { subscription_method: method };
+    if (shop && shop.subscriptionMethod !== method) {
+      updates.subscription_start_date = null;
+    }
+
     const { error } = await supabase
       .from('shops')
-      .update({ subscription_method: method })
+      .update(updates)
       .eq('id', cleanSlug);
 
     if (error) throw new Error(error.message);
@@ -974,7 +981,7 @@ module.exports = {
     return mapSettingsRowToApp(settingsRow);
   },
 
-  async updateGlobalSettings({ paymentQr, paymentInstructions, subscriptionMethod, systemDeveloperFee, dailyFee, monthlyFee, perStampDeveloperFee, perStampFee }) {
+  async updateGlobalSettings({ paymentQr, paymentInstructions, subscriptionMethod, systemDeveloperFee, dailyFee, monthlyFee, monthlyPlanMonths, perStampDeveloperFee, perStampFee }) {
     const updates = {};
     if (paymentQr !== undefined) updates.payment_qr = paymentQr;
     if (paymentInstructions !== undefined) updates.payment_instructions = paymentInstructions;
@@ -982,6 +989,7 @@ module.exports = {
     if (systemDeveloperFee !== undefined) updates.system_developer_fee = parseFloat(systemDeveloperFee) || 0;
     if (dailyFee !== undefined) updates.daily_fee = parseFloat(dailyFee) || 0;
     if (monthlyFee !== undefined) updates.monthly_fee = parseFloat(monthlyFee) || 0;
+    if (monthlyPlanMonths !== undefined) updates.monthly_plan_months = parseInt(monthlyPlanMonths) || 3;
     if (perStampDeveloperFee !== undefined) updates.per_stamp_developer_fee = parseFloat(perStampDeveloperFee) || 0;
     if (perStampFee !== undefined) updates.per_stamp_fee = parseFloat(perStampFee) || 0;
 
@@ -990,7 +998,12 @@ module.exports = {
       .update(updates)
       .eq('id', 1);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (error.message.includes('column') || error.code === '42703') {
+        throw new Error("Database column 'monthly_plan_months' is missing. Please run the following SQL command in your Supabase SQL Editor first:\n\nALTER TABLE global_settings ADD COLUMN IF NOT EXISTS monthly_plan_months INT DEFAULT 3;");
+      }
+      throw new Error(error.message);
+    }
     return this.getGlobalSettings();
   },
 
@@ -998,7 +1011,89 @@ module.exports = {
     const method = shop.subscriptionMethod || settings.subscriptionMethod || 'onetime_daily';
     const now = new Date();
     
+    // Sum only payments confirmed since the active subscription plan started (if applicable)
+    let totalPaid = 0;
     if (shop.subscriptionStartDate) {
+      const subStart = new Date(shop.subscriptionStartDate);
+      const subStartMs = subStart.getTime() - 60000; // 1-minute tolerance
+      if (shop.payments && shop.payments.length > 0) {
+        shop.payments.forEach(p => {
+          if (p.status === 'confirmed') {
+            const verifiedTime = p.verifiedAt ? new Date(p.verifiedAt).getTime() : new Date(p.timestamp).getTime();
+            if (verifiedTime >= subStartMs) {
+              totalPaid += p.amount;
+            }
+          }
+        });
+      } else {
+        totalPaid = shop.totalPaid || 0;
+      }
+    } else {
+      if (shop.payments && shop.payments.length > 0) {
+        shop.payments.forEach(p => {
+          if (p.status === 'confirmed') totalPaid += p.amount;
+        });
+      } else {
+        totalPaid = shop.totalPaid || 0;
+      }
+    }
+
+    if (shop.subscriptionStartDate) {
+      if (method === 'monthly') {
+        const monthlyFee = parseFloat(settings.monthlyFee) || 1250;
+        const monthlyPlanMonths = parseInt(settings.monthlyPlanMonths) || 3;
+        const subStart = new Date(shop.subscriptionStartDate);
+        
+        let monthsElapsed = (now.getFullYear() - subStart.getFullYear()) * 12 + (now.getMonth() - subStart.getMonth());
+        if (now.getDate() < subStart.getDate()) {
+          monthsElapsed--;
+        }
+        monthsElapsed = Math.max(0, monthsElapsed);
+        
+        const elapsedTerms = Math.max(1, Math.ceil((monthsElapsed + 1) / monthlyPlanMonths));
+        const totalBilledDues = elapsedTerms * monthlyFee;
+        const outstandingBalance = Math.max(0, totalBilledDues - totalPaid);
+        
+        const paidTerms = Math.floor(totalPaid / monthlyFee);
+        const expirationDate = new Date(subStart);
+        expirationDate.setMonth(expirationDate.getMonth() + (paidTerms * monthlyPlanMonths));
+        
+        const diffTime = expirationDate.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const isNearExpiration = diffDays <= 7 && diffDays > 0;
+        const isExpired = diffDays <= 0;
+        
+        let breakdown = `Flat Rate Plan: ₱${monthlyFee.toLocaleString()} for ${monthlyPlanMonths} months. `;
+        if (isExpired) {
+          breakdown += `Expired on ${formatDateShort(expirationDate)}. Please renew your subscription.`;
+        } else {
+          breakdown += `Active until ${formatDateShort(expirationDate)}.`;
+        }
+        
+        const methodLabel = `Flat Rate Plan (${monthlyPlanMonths} Months)`;
+        
+        return {
+          method,
+          selectedPlan: shop.subscriptionMethod || settings.subscriptionMethod || 'onetime_daily',
+          methodLabel,
+          breakdown,
+          accumulatedFee: totalBilledDues,
+          totalPaid,
+          outstandingBalance,
+          billedOutstanding: outstandingBalance,
+          daysActive: Math.ceil((now - new Date(shop.createdAt)) / (1000 * 60 * 60 * 24)),
+          isOverdue: isExpired,
+          subscriptionStartDate: shop.subscriptionStartDate,
+          expirationDate: expirationDate.toISOString(),
+          isNearExpiration,
+          isExpired,
+          diffDays,
+          monthlyFee,
+          monthlyPlanMonths
+        };
+      }
+
+      // Rest of subscriptionStartDate exists logic (daily/stamp plans)
       const cycleInfo = getBillingCycles(shop.subscriptionStartDate, now);
       const completed = cycleInfo.completed;
       const ongoing = cycleInfo.ongoing;
@@ -1006,21 +1101,17 @@ module.exports = {
       let totalBilledDues = 0;
       let cycleBreakdowns = [];
       
-      // 1. Setup Developer Fee
       let developerFee = 0;
       if (method === 'onetime_daily') {
         developerFee = parseFloat(settings.systemDeveloperFee) || 0;
         totalBilledDues += developerFee;
         cycleBreakdowns.push(`System Developer Fee: ₱${developerFee.toLocaleString()} (One-time)`);
-      } else if (method === 'monthly') {
-        developerFee = 0;
       } else if (method === 'per_stamp') {
         developerFee = parseFloat(settings.perStampDeveloperFee) || 0;
         totalBilledDues += developerFee;
         cycleBreakdowns.push(`System Developer Fee: ₱${developerFee.toLocaleString()} (One-time)`);
       }
       
-      // 2. Completed billing cycles
       for (let idx = 0; idx < completed.length; idx++) {
         const c = completed[idx];
         const cycleDays = Math.ceil((c.end - c.start) / (1000 * 60 * 60 * 24));
@@ -1031,10 +1122,6 @@ module.exports = {
           cycleFee = cycleDays * (parseFloat(settings.dailyFee) || 0);
           totalBilledDues += cycleFee;
           cycleBreakdowns.push(`SOA #${cycleNum} (${formatDateShort(c.start)} to ${formatDateShort(c.end)}): ₱${cycleFee.toLocaleString()} (${cycleDays} day(s) * ₱${settings.dailyFee}) - Released: ${formatDateShort(c.soaDate)}, Due: ${formatDateShort(c.dueDate)}`);
-        } else if (method === 'monthly') {
-          cycleFee = parseFloat(settings.monthlyFee) || 0;
-          totalBilledDues += cycleFee;
-          cycleBreakdowns.push(`SOA #${cycleNum} (${formatDateShort(c.start)} to ${formatDateShort(c.end)}): ₱${cycleFee.toLocaleString()} (Flat Monthly) - Released: ${formatDateShort(c.soaDate)}, Due: ${formatDateShort(c.dueDate)}`);
         } else if (method === 'per_stamp') {
           const stampsInCycle = await countStampsInPeriod(c.start, c.end, shop.id);
           cycleFee = stampsInCycle * (parseFloat(settings.perStampFee) || 0);
@@ -1043,16 +1130,12 @@ module.exports = {
         }
       }
       
-      // 3. Ongoing active cycle unbilled
       const ongoingDays = Math.max(0, Math.floor((now - ongoing.start) / (1000 * 60 * 60 * 24)));
       let ongoingFee = 0;
       let ongoingLabel = '';
       if (method === 'onetime_daily') {
         ongoingFee = ongoingDays * (parseFloat(settings.dailyFee) || 0);
         ongoingLabel = `Current Cycle Daily Usage (${formatDateShort(ongoing.start)} to present): ₱${ongoingFee.toLocaleString()} (${ongoingDays} day(s) * ₱${settings.dailyFee}) - Next SOA: ${formatDateShort(ongoing.end)}`;
-      } else if (method === 'monthly') {
-        ongoingFee = 0;
-        ongoingLabel = `Current Cycle (${formatDateShort(ongoing.start)} to present): ₱0 (Flat Monthly billed on cycle end) - Next SOA: ${formatDateShort(ongoing.end)}`;
       } else if (method === 'per_stamp') {
         const stampsInOngoing = await countStampsInPeriod(ongoing.start, now, shop.id);
         ongoingFee = stampsInOngoing * (parseFloat(settings.perStampFee) || 0);
@@ -1060,20 +1143,9 @@ module.exports = {
       }
       
       const accumulatedFee = totalBilledDues + ongoingFee;
-      
-      let totalPaid = 0;
-      if (shop.payments && shop.payments.length > 0) {
-        shop.payments.forEach(p => {
-          if (p.status === 'confirmed') totalPaid += p.amount;
-        });
-      } else {
-        totalPaid = shop.totalPaid || 0;
-      }
-      
       const outstandingBalance = Math.max(0, accumulatedFee - totalPaid);
       const billedOutstanding = Math.max(0, totalBilledDues - totalPaid);
       
-      // Calculate isOverdue
       let isOverdue = false;
       let runningBilled = developerFee;
       for (const c of completed) {
@@ -1081,8 +1153,6 @@ module.exports = {
         const cycleDays = Math.ceil((c.end - c.start) / (1000 * 60 * 60 * 24));
         if (method === 'onetime_daily') {
           cycleFee = cycleDays * (parseFloat(settings.dailyFee) || 0);
-        } else if (method === 'monthly') {
-          cycleFee = parseFloat(settings.monthlyFee) || 0;
         } else if (method === 'per_stamp') {
           const stampsInCycle = await countStampsInPeriod(c.start, c.end, shop.id);
           cycleFee = stampsInCycle * (parseFloat(settings.perStampFee) || 0);
@@ -1096,7 +1166,7 @@ module.exports = {
       
       const methodLabel = method === 'onetime_daily' 
         ? 'Daily Active Plan (Billed Monthly)' 
-        : (method === 'monthly' ? 'Flat Monthly Subscription (Billed Monthly)' : 'Pay-Per-Stamp Plan (Billed Monthly)');
+        : 'Pay-Per-Stamp Plan (Billed Monthly)';
       
       let breakdownText = cycleBreakdowns.join(' | ') || 'No statement of account released yet.';
       if (ongoingLabel) {
@@ -1144,36 +1214,25 @@ module.exports = {
         breakdown = `System Developer Fee: ₱${developerFee.toLocaleString()} (One-time) + Daily Fee: ₱${dailyFee} (${activeDays} day(s) active on paid plan)`;
         accumulatedFee = developerFee + (activeDays * dailyFee);
       } else if (method === 'monthly') {
-        const monthlyFee = parseFloat(settings.monthlyFee) || 0;
-        const monthsActive = Math.max(1, Math.ceil(activeDays / 30));
-        methodLabel = 'Flat Monthly Subscription';
-        breakdown = `Monthly Fee: ₱${monthlyFee.toLocaleString()} (${monthsActive} month(s) active on paid plan)`;
-        accumulatedFee = monthsActive * monthlyFee;
+        const monthlyFee = parseFloat(settings.monthlyFee) || 1250;
+        const monthlyPlanMonths = parseInt(settings.monthlyPlanMonths) || 3;
+        methodLabel = `Flat Rate Plan (${monthlyPlanMonths} Months)`;
+        breakdown = `Subscription fee: ₱${monthlyFee.toLocaleString()} for ${monthlyPlanMonths} months. Active upon payment confirmation.`;
+        accumulatedFee = monthlyFee;
       } else if (method === 'per_stamp') {
         const perStampFee = parseFloat(settings.perStampFee) || 0;
         const developerFee = parseFloat(settings.perStampDeveloperFee) || 0;
-        
         const totalStamps = await countTotalStamps(shop.id);
-        
         methodLabel = 'Pay-As-You-Go per Stamp';
         breakdown = `System Developer Fee: ₱${developerFee.toLocaleString()} (One-time) + Fee per Stamp: ₱${perStampFee.toLocaleString()} (${totalStamps} stamp(s) issued)`;
         accumulatedFee = developerFee + (totalStamps * perStampFee);
       }
     }
     
-    let totalPaid = 0;
-    if (shop.payments && shop.payments.length > 0) {
-      shop.payments.forEach(p => {
-        if (p.status === 'confirmed') totalPaid += p.amount;
-      });
-    } else {
-      totalPaid = shop.totalPaid || 0;
-    }
-    
     const outstandingBalance = Math.max(0, accumulatedFee - totalPaid);
     
     return {
-      method: daysActive <= 7 ? 'trial' : method,
+      method: daysActive <= trialDays ? 'trial' : method,
       selectedPlan: shop.subscriptionMethod || settings.subscriptionMethod || 'onetime_daily',
       methodLabel,
       breakdown,

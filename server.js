@@ -63,7 +63,7 @@ function requireSuperAdminAuth(req, res, next) {
   }
 }
 
-// Check if shop is suspended
+// Check if shop is suspended or expired
 async function checkShopSuspension(req, res, next) {
   let shopSlug = req.params.shopSlug;
   if (!shopSlug && req.params.customerId) {
@@ -74,8 +74,23 @@ async function checkShopSuspension(req, res, next) {
   if (shopSlug) {
     try {
       const shop = await db.getShop(shopSlug);
-      if (shop && shop.isSuspended) {
-        return res.status(403).json({ error: 'This store has been suspended.' });
+      if (shop) {
+        if (shop.isSuspended) {
+          return res.status(403).json({ error: 'This store has been suspended by the administrator.' });
+        }
+        
+        // Check trial/subscription expiration
+        const summary = await db.getShopBillingSummary(shop.id);
+        const trialDays = 7 + (shop.trialExtensionDays || 0);
+        const isTrialOverdue = (!shop.subscriptionStartDate || shop.subscriptionMethod === 'trial') && summary.daysActive > trialDays && summary.outstandingBalance > 0;
+        const isSubscriptionExpired = summary.method === 'monthly' && summary.isExpired;
+        
+        if (isTrialOverdue) {
+          return res.status(403).json({ error: 'This store\'s free trial has expired. Please subscribe to active plan.' });
+        }
+        if (isSubscriptionExpired) {
+          return res.status(403).json({ error: 'This store\'s Flat Rate subscription has expired. Please renew.' });
+        }
       }
     } catch (error) {
       return res.status(500).json({ error: error.message });
@@ -171,6 +186,7 @@ app.get('/api/shops/:shopSlug/billing', requireOwnerAuth, async (req, res) => {
         systemDeveloperFee: settings.systemDeveloperFee,
         dailyFee: settings.dailyFee,
         monthlyFee: settings.monthlyFee,
+        monthlyPlanMonths: settings.monthlyPlanMonths,
         perStampFee: settings.perStampFee,
         perStampDeveloperFee: settings.perStampDeveloperFee
       }
@@ -196,6 +212,7 @@ app.post('/api/shops/:shopSlug/subscription-plan', requireOwnerAuth, async (req,
         systemDeveloperFee: settings.systemDeveloperFee,
         dailyFee: settings.dailyFee,
         monthlyFee: settings.monthlyFee,
+        monthlyPlanMonths: settings.monthlyPlanMonths,
         perStampFee: settings.perStampFee,
         perStampDeveloperFee: settings.perStampDeveloperFee
       }
@@ -502,6 +519,7 @@ app.post('/api/superadmin/settings', requireSuperAdminAuth, async (req, res) => 
     systemDeveloperFee,
     dailyFee, 
     monthlyFee, 
+    monthlyPlanMonths,
     perStampDeveloperFee,
     perStampFee 
   } = req.body;
@@ -514,6 +532,7 @@ app.post('/api/superadmin/settings', requireSuperAdminAuth, async (req, res) => 
       systemDeveloperFee: systemDeveloperFee !== undefined ? systemDeveloperFee : onetimeSetupFee,
       dailyFee, 
       monthlyFee, 
+      monthlyPlanMonths,
       perStampDeveloperFee,
       perStampFee 
     });

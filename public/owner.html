@@ -223,6 +223,34 @@
           Subscribe Now
         </button>
       </div>
+
+      <!-- Subscription Expired Warning Banner -->
+      <div id="subscriptionExpiredBanner" class="hidden glass p-5 rounded-2xl border border-rose-500/20 bg-rose-950/20 text-slate-200 text-xs flex flex-col md:flex-row items-center justify-between gap-4 shadow-md animate-pulse">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">⚠️</span>
+          <div class="space-y-0.5 text-left">
+            <p class="font-bold text-white text-sm">Your Subscription Has Expired</p>
+            <p class="text-slate-400">Your Flat Rate subscription plan has expired. Cashier scanner functions and customer loyalty points cards are suspended. Please renew your subscription to reactivate your portal services.</p>
+          </div>
+        </div>
+        <button onclick="scrollToCard('dashboardBillingCard'); showPaidSubscriptionInfo();" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 px-5 rounded-xl transition-all shrink-0 text-xs shadow-md">
+          Renew Now
+        </button>
+      </div>
+
+      <!-- Subscription Renewal Near Warning Banner -->
+      <div id="subscriptionRenewalNearBanner" class="hidden glass p-5 rounded-2xl border border-amber-500/25 bg-amber-950/20 text-slate-200 text-xs flex flex-col md:flex-row items-center justify-between gap-4 shadow-md">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">⏳</span>
+          <div class="space-y-0.5 text-left">
+            <p class="font-bold text-white text-sm">Subscription Expiring Soon</p>
+            <p id="subscriptionRenewalNearText" class="text-slate-400">Your Flat Rate subscription will expire soon. Would you like to renew now to prevent service interruptions?</p>
+          </div>
+        </div>
+        <button onclick="scrollToCard('dashboardBillingCard'); showPaidSubscriptionInfo();" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-5 rounded-xl transition-all shrink-0 text-xs shadow-md">
+          Renew Plan
+        </button>
+      </div>
       
       <!-- Desktop Tab Navigation -->
       <div class="flex border-b border-slate-800 gap-1 sm:gap-2 overflow-x-auto pb-px justify-around sm:justify-start w-full sm:w-auto" id="ownerTabs">
@@ -787,19 +815,19 @@
             </div>
           </div>
 
-          <!-- Plan 2: Flat Monthly subscription -->
+          <!-- Plan 2: Flat Rate subscription -->
           <div onclick="selectSubscriptionPlan('monthly')" id="planCard-monthly" class="glass p-4 rounded-xl border border-slate-800 hover:border-indigo-500/50 cursor-pointer transition-all space-y-2 flex flex-col justify-between hover:bg-slate-900/10 relative">
             <div class="space-y-1">
               <div class="flex justify-between items-center">
-                <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Monthly Plan</span>
+                <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Flat Rate Plan</span>
                 <span id="planBadge-monthly" class="text-[8px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.5 rounded font-black uppercase hidden">Selected</span>
               </div>
-              <h4 class="text-sm font-extrabold text-white">Flat Monthly</h4>
-              <p id="planDesc-monthly" class="text-[10px] text-slate-400 leading-snug">₱1,500 monthly subscription. No system developer fee required.</p>
+              <h4 class="text-sm font-extrabold text-white">Flat Rate</h4>
+              <p id="planDesc-monthly" class="text-[10px] text-slate-400 leading-snug">₱1,250 subscription. Active for 3 months. No system developer fee required.</p>
             </div>
             <div class="text-[10px] text-slate-555 border-t border-slate-850 pt-2 font-semibold flex justify-between items-center">
               <span>Flat Rate</span>
-              <span id="planRate-monthly" class="text-white font-mono">₱1,500/mo</span>
+              <span id="planRate-monthly" class="text-white font-mono">₱1,250/3 mos</span>
             </div>
           </div>
 
@@ -1397,10 +1425,12 @@
       const planDescMonthly = document.getElementById('planDesc-monthly');
       const planRateMonthly = document.getElementById('planRate-monthly');
       if (planDescMonthly) {
-        planDescMonthly.textContent = `₱${monthlyFee.toLocaleString()} monthly subscription. No system developer fee required.`;
+        const planMonths = pricing.monthlyPlanMonths !== undefined ? pricing.monthlyPlanMonths : 3;
+        planDescMonthly.textContent = `₱${monthlyFee.toLocaleString()} subscription. Active for ${planMonths} months. No system developer fee required.`;
       }
       if (planRateMonthly) {
-        planRateMonthly.textContent = `₱${monthlyFee.toLocaleString()}/mo`;
+        const planMonths = pricing.monthlyPlanMonths !== undefined ? pricing.monthlyPlanMonths : 3;
+        planRateMonthly.textContent = `₱${monthlyFee.toLocaleString()}/${planMonths} mos`;
       }
 
       // Update Stamp Plan card
@@ -1510,7 +1540,7 @@
           const billingData = await billingRes.json();
           if (billingData.billingSummary) {
             isTrialActive = billingData.billingSummary.method === 'trial';
-            isTrialExpired = billingData.billingSummary.daysActive > 7 && billingData.billingSummary.outstandingBalance > 0;
+            isTrialExpired = (billingData.billingSummary.method === 'trial' && billingData.billingSummary.daysActive > (7 + (shop.trialExtensionDays || 0)) && billingData.billingSummary.outstandingBalance > 0) || (billingData.billingSummary.method === 'monthly' && billingData.billingSummary.isExpired);
           }
           if (billingData.paymentQr) {
             document.getElementById('suspendedQrImg').src = billingData.paymentQr;
@@ -2123,14 +2153,16 @@
         // Sync local shop variable
         shop = shopData;
         
+        let billingSummary = null;
         const billingRes = await fetchWithAuth(`/api/shops/${shopSlug}/billing`);
         if (billingRes.ok) {
           const billingData = await billingRes.json();
-          if (billingData.billingSummary) {
-            isTrialActive = billingData.billingSummary.method === 'trial';
-            isTrialExpired = billingData.billingSummary.daysActive > 7 && billingData.billingSummary.outstandingBalance > 0;
+          billingSummary = billingData.billingSummary;
+          if (billingSummary) {
+            isTrialActive = billingSummary.method === 'trial';
+            isTrialExpired = (billingSummary.method === 'trial' && billingSummary.daysActive > (7 + (shop.trialExtensionDays || 0)) && billingSummary.outstandingBalance > 0) || (billingSummary.method === 'monthly' && billingSummary.isExpired);
           }
-          renderBillingDetails(billingData.billingSummary);
+          renderBillingDetails(billingSummary);
           if (billingData.pricing) {
             activePricing = billingData.pricing; // Global sync
             updatePlanCardsPricing(billingData.pricing);
@@ -2143,37 +2175,70 @@
 
         // Check suspension changes dynamically
         const trialExpiredBanner = document.getElementById('trialExpiredBanner');
+        const subExpiredBanner = document.getElementById('subscriptionExpiredBanner');
+        const subRenewalNearBanner = document.getElementById('subscriptionRenewalNearBanner');
+        
+        if (trialExpiredBanner) trialExpiredBanner.classList.add('hidden');
+        if (subExpiredBanner) subExpiredBanner.classList.add('hidden');
+        if (subRenewalNearBanner) subRenewalNearBanner.classList.add('hidden');
+
         if (shop.isSuspended) {
           if (isTrialExpired) {
             document.getElementById('suspendedOverlay').classList.add('hidden');
-            if (trialExpiredBanner) {
-              trialExpiredBanner.classList.remove('hidden');
+            if (billingSummary && billingSummary.method === 'trial') {
+              if (trialExpiredBanner) trialExpiredBanner.classList.remove('hidden');
+            } else if (billingSummary && billingSummary.method === 'monthly') {
+              if (subExpiredBanner) subExpiredBanner.classList.remove('hidden');
             }
             const consoleTab = document.getElementById('tabBtn-console');
             const catalogTab = document.getElementById('tabBtn-catalog');
             if (consoleTab) {
               consoleTab.classList.add('opacity-45', 'cursor-not-allowed');
-              consoleTab.setAttribute('title', 'Disabled - Trial Expired');
+              consoleTab.setAttribute('title', 'Disabled - Subscription Expired');
             }
             if (catalogTab) {
               catalogTab.classList.add('opacity-45', 'cursor-not-allowed');
-              catalogTab.setAttribute('title', 'Disabled - Trial Expired');
+              catalogTab.setAttribute('title', 'Disabled - Subscription Expired');
             }
           }
         } else {
           document.getElementById('suspendedOverlay').classList.add('hidden');
-          if (trialExpiredBanner) {
-            trialExpiredBanner.classList.add('hidden');
-          }
-          const consoleTab = document.getElementById('tabBtn-console');
-          const catalogTab = document.getElementById('tabBtn-catalog');
-          if (consoleTab) {
-            consoleTab.classList.remove('opacity-45', 'cursor-not-allowed');
-            consoleTab.removeAttribute('title');
-          }
-          if (catalogTab) {
-            catalogTab.classList.remove('opacity-45', 'cursor-not-allowed');
-            catalogTab.removeAttribute('title');
+          if (isTrialExpired) {
+            if (billingSummary && billingSummary.method === 'trial') {
+              if (trialExpiredBanner) trialExpiredBanner.classList.remove('hidden');
+            } else if (billingSummary && billingSummary.method === 'monthly') {
+              if (subExpiredBanner) subExpiredBanner.classList.remove('hidden');
+            }
+            const consoleTab = document.getElementById('tabBtn-console');
+            const catalogTab = document.getElementById('tabBtn-catalog');
+            if (consoleTab) {
+              consoleTab.classList.add('opacity-45', 'cursor-not-allowed');
+              consoleTab.setAttribute('title', 'Disabled - Subscription Expired');
+            }
+            if (catalogTab) {
+              catalogTab.classList.add('opacity-45', 'cursor-not-allowed');
+              catalogTab.setAttribute('title', 'Disabled - Subscription Expired');
+            }
+          } else {
+            const consoleTab = document.getElementById('tabBtn-console');
+            const catalogTab = document.getElementById('tabBtn-catalog');
+            if (consoleTab) {
+              consoleTab.classList.remove('opacity-45', 'cursor-not-allowed');
+              consoleTab.removeAttribute('title');
+            }
+            if (catalogTab) {
+              consoleTab.classList.remove('opacity-45', 'cursor-not-allowed');
+              catalogTab.removeAttribute('title');
+            }
+            if (billingSummary && billingSummary.method === 'monthly' && billingSummary.isNearExpiration) {
+              if (subRenewalNearBanner) {
+                const subRenewalNearText = document.getElementById('subscriptionRenewalNearText');
+                if (subRenewalNearText) {
+                  subRenewalNearText.textContent = `Your Flat Rate subscription will expire in ${billingSummary.diffDays} day(s) on ${formatDateShort(billingSummary.expirationDate)}. Would you like to renew now to prevent service interruptions?`;
+                }
+                subRenewalNearBanner.classList.remove('hidden');
+              }
+            }
           }
         }
 
@@ -2378,9 +2443,9 @@
     }
 
     function switchTab(tabId) {
-      // If trial has expired, prevent clicking console or catalog
+      // If trial or subscription has expired, prevent clicking console or catalog
       if (isTrialExpired && (tabId === 'console' || tabId === 'catalog')) {
-        alert('Your trial has expired. Please subscribe under the Subscription & Billing tab to access this section.');
+        alert('Your subscription has expired. Please renew or subscribe under the Subscription & Billing tab to access this section.');
         return;
       }
 
@@ -2517,11 +2582,12 @@
         detailEstimatedDue.textContent = `₱${pricing.systemDeveloperFee.toLocaleString()}`;
         detailEstimatedDueLabel.textContent = 'setup fee';
       } else if (method === 'monthly') {
-        detailPlanName.textContent = 'Flat Monthly';
+        const monthlyPlanMonths = pricing.monthlyPlanMonths !== undefined ? pricing.monthlyPlanMonths : 3;
+        detailPlanName.textContent = `Flat Rate (${monthlyPlanMonths} Months)`;
         detailSystemFee.textContent = 'None';
-        detailRate.textContent = `₱${pricing.monthlyFee.toLocaleString()}/month`;
+        detailRate.textContent = `₱${pricing.monthlyFee.toLocaleString()} for ${monthlyPlanMonths} months`;
         detailEstimatedDue.textContent = `₱${pricing.monthlyFee.toLocaleString()}`;
-        detailEstimatedDueLabel.textContent = 'first month subscription';
+        detailEstimatedDueLabel.textContent = `active for ${monthlyPlanMonths} months`;
       } else if (method === 'per_stamp') {
         detailPlanName.textContent = 'Pay-Per-Stamp';
         detailSystemFee.textContent = `₱${pricing.perStampDeveloperFee.toLocaleString()} (One-time)`;
@@ -2583,7 +2649,7 @@
         if (tempSelectedPlan === 'onetime_daily') {
           planCost = pricing.systemDeveloperFee !== undefined ? pricing.systemDeveloperFee : (pricing.onetimeSetupFee !== undefined ? pricing.onetimeSetupFee : 1500);
         } else if (tempSelectedPlan === 'monthly') {
-          planCost = pricing.monthlyFee !== undefined ? pricing.monthlyFee : 1899;
+          planCost = pricing.monthlyFee !== undefined ? pricing.monthlyFee : 1250;
         } else if (tempSelectedPlan === 'per_stamp') {
           planCost = pricing.perStampDeveloperFee !== undefined ? pricing.perStampDeveloperFee : 3000;
         }
@@ -2599,7 +2665,7 @@
         if (tempSelectedPlan === 'onetime_daily') {
           planLabel = 'Daily active';
         } else if (tempSelectedPlan === 'monthly') {
-          planLabel = 'Flat Monthly';
+          planLabel = `Flat Rate (${pricing.monthlyPlanMonths || 3} Months)`;
         } else if (tempSelectedPlan === 'per_stamp') {
           planLabel = 'Pay-Per-Stamp';
         } else {
