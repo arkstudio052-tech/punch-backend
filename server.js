@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -441,9 +442,9 @@ app.post('/api/superadmin/shops/:shopSlug/payment', requireSuperAdminAuth, async
 
 // Update store details
 app.put('/api/superadmin/shops/:shopSlug', requireSuperAdminAuth, async (req, res) => {
-  const { name, rule, ownerUsername, ownerPassword } = req.body;
+  const { name, rule, ownerUsername, ownerPassword, trialExtensionDays } = req.body;
   try {
-    const shop = await db.updateShopDetails(req.params.shopSlug, { name, rule, ownerUsername, ownerPassword });
+    const shop = await db.updateShopDetails(req.params.shopSlug, { name, rule, ownerUsername, ownerPassword, trialExtensionDays });
     res.json(shop);
   } catch (error) {
     res.status(400).json({ error: error.message });

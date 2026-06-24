@@ -1,46 +1,16 @@
-const fs = require('fs');
-const path = require('path');
-const admin = require('firebase-admin');
+const { createClient } = require('@supabase/supabase-js');
 
-const DB_FILE = path.join(__dirname, 'db.json');
+// Initialize Supabase Client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const serviceAccountPath = path.join(__dirname, 'service-account-key.json');
-
-// Initialize Firebase Admin
-if (admin.getApps().length === 0) {
-  let credential;
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    try {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-      credential = admin.cert(serviceAccount);
-    } catch (e) {
-      console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable:', e);
-    }
-  }
-  
-  if (!credential) {
-    if (fs.existsSync(serviceAccountPath)) {
-      credential = admin.cert(serviceAccountPath);
-    } else {
-      try {
-        credential = admin.applicationDefault();
-      } catch (e) {
-        console.warn('Warning: Application Default Credentials not found. Local mock mode or admin credentials required.');
-      }
-    }
-  }
-
-  admin.initializeApp({
-    credential,
-    databaseURL: "https://punch-loyalty-card-default-rtdb.firebaseio.com"
-  });
+if (!supabaseUrl || !supabaseKey) {
+  console.error('CRITICAL: Supabase credentials are missing in env configuration.');
 }
 
-const { getDatabase } = require('firebase-admin/database');
-const rtdb = getDatabase();
-const dbRef = rtdb.ref('/');
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Billing helper functions
+// Formatting helpers
 function formatDateShort(date) {
   if (!date) return '';
   const d = new Date(date);
@@ -83,120 +53,209 @@ function getBillingCycles(startDateStr, now) {
   return { completed: cycles, ongoing };
 }
 
-function countStampsInPeriod(start, end, shopId, db) {
+// Aggregation DB query helpers for stamps
+async function countStampsInPeriod(start, end, shopId) {
   const cleanShopId = shopId.toLowerCase();
-  const customers = Object.values(db.customers || {}).filter(c => c.shopId === cleanShopId);
   let stamps = 0;
   
-  const startTime = start.getTime();
-  const endTime = end.getTime();
-  
-  customers.forEach(c => {
-    const cTime = new Date(c.createdAt).getTime();
-    if (cTime >= startTime && cTime < endTime) {
+  // 1. Sum of points from customers registered during the period
+  const { data: newCustomers, error: custErr } = await supabase
+    .from('customers')
+    .select('points')
+    .eq('shop_id', cleanShopId)
+    .gte('created_at', start.toISOString())
+    .lt('created_at', end.toISOString());
+    
+  if (custErr) {
+    console.error('Error fetching new customers for stamps count:', custErr);
+  } else if (newCustomers) {
+    newCustomers.forEach(c => {
       stamps += c.points || 0;
-    }
-    const redemptions = c.redemptions || [];
-    redemptions.forEach(r => {
-      const rTime = new Date(r.redeemedAt).getTime();
-      if (rTime >= startTime && rTime < endTime) {
-        stamps += r.pointsRedeemed || 0;
-      }
     });
-  });
+  }
+
+  // 2. Sum of pointsRedeemed in redemptions during the period
+  const { data: redemptions, error: redErr } = await supabase
+    .from('customer_redemptions')
+    .select('points_redeemed, customers!inner(shop_id)')
+    .eq('customers.shop_id', cleanShopId)
+    .gte('redeemed_at', start.toISOString())
+    .lt('redeemed_at', end.toISOString());
+
+  if (redErr) {
+    console.error('Error fetching redemptions for stamps count:', redErr);
+  } else if (redemptions) {
+    redemptions.forEach(r => {
+      stamps += r.points_redeemed || 0;
+    });
+  }
+  
   return stamps;
 }
 
-// Helper to read database
-async function readDb() {
-  try {
-    const snapshot = await dbRef.once('value');
-    let data = snapshot.val();
+async function countTotalStamps(shopId) {
+  const cleanShopId = shopId.toLowerCase();
+  let stamps = 0;
+  
+  // 1. Total points of all current customers
+  const { data: customers, error: custErr } = await supabase
+    .from('customers')
+    .select('points')
+    .eq('shop_id', cleanShopId);
     
-    // Seed DB if it's empty in Realtime Database
-    if (!data || (!data.shops && !data.customers)) {
-      if (fs.existsSync(DB_FILE)) {
-        console.log('Seeding Realtime Database from local db.json...');
-        try {
-          const fileData = fs.readFileSync(DB_FILE, 'utf8');
-          data = JSON.parse(fileData);
-          await dbRef.set(data);
-        } catch (err) {
-          console.error('Failed to parse local db.json for seeding:', err);
-          data = { shops: {}, customers: {}, notifications: [] };
-        }
-      } else {
-        data = { shops: {}, customers: {}, notifications: [] };
-      }
-    }
-    
-    if (!data.shops) data.shops = {};
-    if (!data.customers) data.customers = {};
-    if (!data.notifications) data.notifications = [];
-    
-    return data;
-  } catch (error) {
-    console.error('Error reading from Firebase Realtime Database:', error);
-    return { shops: {}, customers: {}, notifications: [] };
+  if (custErr) {
+    console.error('Error fetching customers for total stamps:', custErr);
+  } else if (customers) {
+    customers.forEach(c => {
+      stamps += c.points || 0;
+    });
   }
+
+  // 2. Total redeemed points
+  const { data: redemptions, error: redErr } = await supabase
+    .from('customer_redemptions')
+    .select('points_redeemed, customers!inner(shop_id)')
+    .eq('customers.shop_id', cleanShopId);
+
+  if (redErr) {
+    console.error('Error fetching redemptions for total stamps:', redErr);
+  } else if (redemptions) {
+    redemptions.forEach(r => {
+      stamps += r.points_redeemed || 0;
+    });
+  }
+  
+  return stamps;
 }
 
-// Helper to write database
-async function writeDb(data) {
-  try {
-    await dbRef.set(data);
-    return true;
-  } catch (error) {
-    console.error('Error writing to Firebase Realtime Database:', error);
-    return false;
+// App data mapping helpers
+function mapShopRowToApp(row, rewards = [], specials = [], payments = []) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    rule: row.rule,
+    logo: row.logo,
+    pointsPerPurchase: row.points_per_purchase,
+    ownerUsername: row.owner_username,
+    ownerPassword: row.owner_password,
+    createdAt: row.created_at,
+    totalPaid: row.total_paid ? parseFloat(row.total_paid) : 0,
+    isSuspended: row.is_suspended,
+    subscriptionMethod: row.subscription_method,
+    subscriptionStartDate: row.subscription_start_date,
+    trialExtensionDays: row.trial_extension_days || 0,
+    rewards: (rewards || []).map(r => ({
+      id: r.id,
+      pointsRequired: r.points_required,
+      rewardText: r.reward_text,
+      isActive: r.is_active
+    })),
+    specials: (specials || []).map(s => s.special_text),
+    payments: (payments || []).map(p => ({
+      id: p.id,
+      amount: p.amount ? parseFloat(p.amount) : 0,
+      referenceNumber: p.reference_number,
+      receiptImage: p.receipt_image,
+      timestamp: p.timestamp,
+      status: p.status,
+      verifiedAt: p.verified_at
+    }))
+  };
+}
+
+function mapCustomerRowToApp(row, redemptions = []) {
+  if (!row) return null;
+  let pendingRedeem = null;
+  if (row.pending_redeem_code) {
+    pendingRedeem = {
+      code: row.pending_redeem_code,
+      pointsRequired: row.pending_redeem_points_required,
+      createdAt: row.pending_redeem_created_at
+    };
   }
+  return {
+    id: row.id,
+    shopId: row.shop_id,
+    phone: row.phone,
+    name: row.name,
+    points: row.points || 0,
+    createdAt: row.created_at,
+    pendingRedeem,
+    redemptions: (redemptions || []).map(r => ({
+      code: r.code,
+      pointsRedeemed: r.points_redeemed,
+      redeemedAt: r.redeemed_at
+    }))
+  };
+}
+
+function mapSettingsRowToApp(row) {
+  if (!row) return {};
+  return {
+    paymentQr: row.payment_qr,
+    paymentInstructions: row.payment_instructions,
+    subscriptionMethod: row.subscription_method,
+    systemDeveloperFee: row.system_developer_fee ? parseFloat(row.system_developer_fee) : 5000,
+    onetimeSetupFee: row.system_developer_fee ? parseFloat(row.system_developer_fee) : 5000,
+    dailyFee: row.daily_fee ? parseFloat(row.daily_fee) : 50,
+    monthlyFee: row.monthly_fee ? parseFloat(row.monthly_fee) : 1500,
+    perStampFee: row.per_stamp_fee ? parseFloat(row.per_stamp_fee) : 1,
+    perStampDeveloperFee: row.per_stamp_developer_fee ? parseFloat(row.per_stamp_developer_fee) : 3000
+  };
+}
+
+function mapNotificationRowToApp(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    shopSlug: row.shop_slug,
+    shopName: row.shop_name,
+    amount: row.amount ? parseFloat(row.amount) : 0,
+    timestamp: row.timestamp,
+    read: row.read
+  };
 }
 
 module.exports = {
   // Shops Methods
   async getShop(slug) {
-    const db = await readDb();
-    const shop = db.shops[slug.toLowerCase()] || null;
-    if (shop) {
-      if (!shop.rewards) {
-        // Fallback parser for old shop.rule string
-        const pointsRequired = parseInt(shop.rule.match(/\d+/)?.[0]) || 10;
-        const rewardText = shop.rule.replace(/^\d+\s*(stamps|points)?\s*=\s*/i, '').trim() || '1 free item';
-        shop.rewards = [{
-          id: 'reward-default',
-          pointsRequired,
-          rewardText,
-          isActive: true
-        }];
-      }
-      if (!shop.ownerUsername) {
-        shop.ownerUsername = 'admin';
-      }
-      if (!shop.ownerPassword) {
-        shop.ownerPassword = 'admin';
-      }
-      if (shop.isSuspended === undefined) {
-        shop.isSuspended = false;
-      }
-      if (!shop.createdAt) {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        shop.createdAt = yesterday.toISOString();
-      }
-      if (shop.totalPaid === undefined) {
-        shop.totalPaid = 0;
-      }
-      if (!shop.payments) {
-        shop.payments = [];
-      }
-      
-      // Dynamic computation of isSuspended
-      shop.isSuspended = this.isShopSuspended(shop, db);
-    }
+    const cleanSlug = slug.toLowerCase();
+    
+    // Get shop base record
+    const { data: shopRow, error: shopErr } = await supabase
+      .from('shops')
+      .select('*')
+      .eq('id', cleanSlug)
+      .maybeSingle();
+
+    if (shopErr || !shopRow) return null;
+
+    // Fetch related tables
+    const { data: rewards } = await supabase
+      .from('shop_rewards')
+      .select('*')
+      .eq('shop_id', cleanSlug);
+
+    const { data: specials } = await supabase
+      .from('shop_specials')
+      .select('*')
+      .eq('shop_id', cleanSlug);
+
+    const { data: payments } = await supabase
+      .from('shop_payments')
+      .select('*')
+      .eq('shop_id', cleanSlug);
+
+    const shop = mapShopRowToApp(shopRow, rewards, specials, payments);
+
+    // Compute dynamic isSuspended flag
+    shop.isSuspended = await this.isShopSuspended(shop);
+
     return shop;
   },
 
-  isShopSuspended(shop, db) {
+  async isShopSuspended(shop) {
     if (shop.isSuspended === true) {
       return true; // Manually suspended by admin
     }
@@ -206,9 +265,10 @@ module.exports = {
     const msActive = Date.now() - createdTime;
     const daysActive = Math.ceil(msActive / (1000 * 60 * 60 * 24));
     
-    if (daysActive > 7) {
-      const settings = db.settings || { subscriptionMethod: 'onetime_daily' };
-      const summary = this.computeBilling(shop, settings, db);
+    const trialDays = 7 + (shop.trialExtensionDays || 0);
+    if (daysActive > trialDays) {
+      const settings = await this.getGlobalSettings();
+      const summary = await this.computeBilling(shop, settings);
       if (summary.outstandingBalance > 0) {
         if (shop.subscriptionStartDate) {
           return !!summary.isOverdue;
@@ -221,21 +281,31 @@ module.exports = {
   },
 
   async getAllShops() {
-    const db = await readDb();
-    return Object.values(db.shops).map(shop => {
-      return {
-        id: shop.id,
-        name: shop.name,
-        logo: shop.logo,
-        rule: shop.rule || ''
-      };
-    });
+    const { data: shopsList, error } = await supabase
+      .from('shops')
+      .select('id, name, logo, rule');
+      
+    if (error || !shopsList) return [];
+    
+    return shopsList.map(shop => ({
+      id: shop.id,
+      name: shop.name,
+      logo: shop.logo,
+      rule: shop.rule || ''
+    }));
   },
 
   async createShop(name, slug, rule, ownerUsername, ownerPassword) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase().trim().replace(/[^a-z0-9-_]/g, '');
-    if (db.shops[cleanSlug]) {
+    
+    // Check if shop slug already exists
+    const { data: existingShop } = await supabase
+      .from('shops')
+      .select('id')
+      .eq('id', cleanSlug)
+      .maybeSingle();
+
+    if (existingShop) {
       throw new Error(`Shop with slug "${cleanSlug}" already exists.`);
     }
     
@@ -243,194 +313,275 @@ module.exports = {
     const pointsRequired = parseInt(inputRule.match(/\d+/)?.[0]) || 10;
     const rewardText = inputRule.replace(/^\d+\s*(stamps|points)?\s*=\s*/i, '').trim() || '1 free coffee';
 
-    const newShop = {
-      id: cleanSlug,
-      name: name.trim(),
-      rule: inputRule,
-      logo: null,
-      pointsPerPurchase: 1,
-      ownerUsername: ownerUsername ? ownerUsername.trim() : 'admin',
-      ownerPassword: ownerPassword ? ownerPassword.trim() : 'admin',
-      createdAt: new Date().toISOString(),
-      totalPaid: 0,
-      payments: [],
-      rewards: [
+    // Insert shop row
+    const { error: insertErr } = await supabase
+      .from('shops')
+      .insert({
+        id: cleanSlug,
+        name: name.trim(),
+        rule: inputRule,
+        logo: null,
+        points_per_purchase: 1,
+        owner_username: ownerUsername ? ownerUsername.trim() : 'admin',
+        owner_password: ownerPassword ? ownerPassword.trim() : 'admin',
+        created_at: new Date().toISOString(),
+        total_paid: 0,
+        is_suspended: false
+      });
+
+    if (insertErr) throw new Error(insertErr.message);
+
+    // Create default reward entry
+    const rewardId = 'reward-default';
+    await supabase
+      .from('shop_rewards')
+      .insert({
+        id: rewardId,
+        shop_id: cleanSlug,
+        points_required: pointsRequired,
+        reward_text: rewardText,
+        is_active: true
+      });
+
+    // Create default specials
+    await supabase
+      .from('shop_specials')
+      .insert([
         {
-          id: 'reward-default',
-          pointsRequired,
-          rewardText,
-          isActive: true
+          shop_id: cleanSlug,
+          special_text: `Welcome to ${name.trim()}! Track your loyalty points here.`
+        },
+        {
+          shop_id: cleanSlug,
+          special_text: "Ask our staff about today's special promotion!"
         }
-      ],
-      specials: [
-        `Welcome to ${name}! Track your loyalty points here.`,
-        'Ask our staff about today\'s special promotion!'
-      ]
-    };
-    
-    db.shops[cleanSlug] = newShop;
-    await writeDb(db);
-    return newShop;
+      ]);
+
+    return this.getShop(cleanSlug);
   },
 
   async updateShopSpecials(slug, specials) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase();
-    if (!db.shops[cleanSlug]) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
     
-    // Ensure specials is an array of strings
-    db.shops[cleanSlug].specials = Array.isArray(specials) 
+    // Clear existing specials
+    const { error: delErr } = await supabase
+      .from('shop_specials')
+      .delete()
+      .eq('shop_id', cleanSlug);
+
+    if (delErr) throw new Error(delErr.message);
+
+    // Insert new specials list
+    const newSpecials = Array.isArray(specials) 
       ? specials.map(s => String(s).trim()).filter(Boolean)
       : [];
+
+    if (newSpecials.length > 0) {
+      const inserts = newSpecials.map(txt => ({
+        shop_id: cleanSlug,
+        special_text: txt
+      }));
+      const { error: insErr } = await supabase
+        .from('shop_specials')
+        .insert(inserts);
+
+      if (insErr) throw new Error(insErr.message);
+    }
     
-    await writeDb(db);
-    return db.shops[cleanSlug];
+    return this.getShop(cleanSlug);
   },
 
   async updateShopLogo(slug, logoDataUrl) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase();
-    if (!db.shops[cleanSlug]) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
-    db.shops[cleanSlug].logo = logoDataUrl;
-    await writeDb(db);
-    return db.shops[cleanSlug];
+    const { error } = await supabase
+      .from('shops')
+      .update({ logo: logoDataUrl })
+      .eq('id', cleanSlug);
+
+    if (error) throw new Error(error.message);
+    return this.getShop(cleanSlug);
   },
 
   async addShopReward(slug, pointsRequired, rewardText) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase();
-    const shop = db.shops[cleanSlug];
-    if (!shop) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
-
-    if (!shop.rewards) {
-      shop.rewards = [];
-    }
-
     const rewardId = `reward-${Date.now()}`;
-    const newReward = {
-      id: rewardId,
-      pointsRequired: parseInt(pointsRequired) || 10,
-      rewardText: rewardText.trim(),
-      isActive: false
-    };
+    
+    const { error } = await supabase
+      .from('shop_rewards')
+      .insert({
+        id: rewardId,
+        shop_id: cleanSlug,
+        points_required: parseInt(pointsRequired) || 10,
+        reward_text: rewardText.trim(),
+        is_active: false
+      });
 
-    shop.rewards.push(newReward);
-    await writeDb(db);
-    return shop;
+    if (error) throw new Error(error.message);
+    return this.getShop(cleanSlug);
   },
 
   async activateShopReward(slug, rewardId) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase();
-    const shop = db.shops[cleanSlug];
-    if (!shop) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
+    
+    // Find reward points required and reward text first
+    const { data: targetReward, error: fetchErr } = await supabase
+      .from('shop_rewards')
+      .select('*')
+      .eq('shop_id', cleanSlug)
+      .eq('id', rewardId)
+      .maybeSingle();
 
-    if (!shop.rewards) {
-      throw new Error('No rewards catalog found for this shop.');
-    }
-
-    const targetReward = shop.rewards.find(r => r.id === rewardId);
-    if (!targetReward) {
+    if (fetchErr || !targetReward) {
       throw new Error('Reward item not found.');
     }
 
-    // Set all other rewards to inactive, and target to active
-    shop.rewards.forEach(r => {
-      r.isActive = (r.id === rewardId);
-    });
+    // Set all rewards of this shop to inactive
+    await supabase
+      .from('shop_rewards')
+      .update({ is_active: false })
+      .eq('shop_id', cleanSlug);
 
-    // Sync legacy text rule
-    shop.rule = `${targetReward.pointsRequired} stamps = ${targetReward.rewardText}`;
+    // Activate the targeted reward
+    await supabase
+      .from('shop_rewards')
+      .update({ is_active: true })
+      .eq('shop_id', cleanSlug)
+      .eq('id', rewardId);
 
-    await writeDb(db);
-    return shop;
+    // Update the legacy rule string on the shops table
+    const ruleString = `${targetReward.points_required} stamps = ${targetReward.reward_text}`;
+    await supabase
+      .from('shops')
+      .update({ rule: ruleString })
+      .eq('id', cleanSlug);
+
+    return this.getShop(cleanSlug);
   },
 
   async deleteShopReward(slug, rewardId) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase();
-    const shop = db.shops[cleanSlug];
-    if (!shop) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
+    
+    const { data: reward } = await supabase
+      .from('shop_rewards')
+      .select('*')
+      .eq('shop_id', cleanSlug)
+      .eq('id', rewardId)
+      .maybeSingle();
 
-    if (!shop.rewards) {
-      throw new Error('No rewards catalog found for this shop.');
-    }
-
-    const targetIndex = shop.rewards.findIndex(r => r.id === rewardId);
-    if (targetIndex === -1) {
-      throw new Error('Reward item not found.');
-    }
-
-    if (shop.rewards[targetIndex].isActive) {
-      throw new Error('Cannot delete the currently active reward rules. Please activate another reward first.');
-    }
-
-    shop.rewards.splice(targetIndex, 1);
-    await writeDb(db);
-    return shop;
-  },
-
-  async editShopReward(slug, rewardId, pointsRequired, rewardText) {
-    const db = await readDb();
-    const cleanSlug = slug.toLowerCase();
-    const shop = db.shops[cleanSlug];
-    if (!shop) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
-
-    if (!shop.rewards) {
-      shop.rewards = [];
-    }
-
-    const reward = shop.rewards.find(r => r.id === rewardId);
     if (!reward) {
       throw new Error('Reward item not found.');
     }
 
-    reward.pointsRequired = parseInt(pointsRequired) || 10;
-    reward.rewardText = rewardText.trim();
-
-    // If this reward is active, we must sync the legacy shop.rule string too!
-    if (reward.isActive) {
-      shop.rule = `${reward.pointsRequired} stamps = ${reward.rewardText}`;
+    if (reward.is_active) {
+      throw new Error('Cannot delete the currently active reward rules. Please activate another reward first.');
     }
 
-    await writeDb(db);
-    return shop;
+    const { error } = await supabase
+      .from('shop_rewards')
+      .delete()
+      .eq('shop_id', cleanSlug)
+      .eq('id', rewardId);
+
+    if (error) throw new Error(error.message);
+    return this.getShop(cleanSlug);
   },
 
-  async getCustomer(id) {
-    const db = await readDb();
-    const customer = db.customers[id];
-    if (customer) {
-      if (!customer.redemptions) customer.redemptions = [];
-      if (!customer.pendingRedeem) customer.pendingRedeem = null;
+  async editShopReward(slug, rewardId, pointsRequired, rewardText) {
+    const cleanSlug = slug.toLowerCase();
+    
+    const { data: reward, error: fetchErr } = await supabase
+      .from('shop_rewards')
+      .select('*')
+      .eq('shop_id', cleanSlug)
+      .eq('id', rewardId)
+      .maybeSingle();
+
+    if (fetchErr || !reward) {
+      throw new Error('Reward item not found.');
     }
-    return customer || null;
+
+    const points = parseInt(pointsRequired) || 10;
+    const txt = rewardText.trim();
+
+    // Update reward item
+    const { error: updErr } = await supabase
+      .from('shop_rewards')
+      .update({
+        points_required: points,
+        reward_text: txt
+      })
+      .eq('shop_id', cleanSlug)
+      .eq('id', rewardId);
+
+    if (updErr) throw new Error(updErr.message);
+
+    // Sync legacy shop.rule if active
+    if (reward.is_active) {
+      const ruleString = `${points} stamps = ${txt}`;
+      await supabase
+        .from('shops')
+        .update({ rule: ruleString })
+        .eq('id', cleanSlug);
+    }
+
+    return this.getShop(cleanSlug);
+  },
+
+  // Customers Methods
+  async getCustomer(id) {
+    const { data: custRow, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error || !custRow) return null;
+
+    // Fetch redemptions history
+    const { data: redemptions } = await supabase
+      .from('customer_redemptions')
+      .select('*')
+      .eq('customer_id', id)
+      .order('redeemed_at', { ascending: false });
+
+    return mapCustomerRowToApp(custRow, redemptions);
   },
 
   async getCustomersByShop(shopId) {
-    const db = await readDb();
     const cleanShopId = shopId.toLowerCase();
-    return Object.values(db.customers).filter(c => c.shopId === cleanShopId);
+    const { data: rows, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('shop_id', cleanShopId);
+
+    if (error || !rows) return [];
+
+    const customersList = [];
+    for (const r of rows) {
+      const { data: redemptions } = await supabase
+        .from('customer_redemptions')
+        .select('*')
+        .eq('customer_id', r.id)
+        .order('redeemed_at', { ascending: false });
+
+      customersList.push(mapCustomerRowToApp(r, redemptions));
+    }
+    return customersList;
   },
 
   async authCustomer(shopId, phone, name) {
-    const db = await readDb();
     const cleanShopId = shopId.toLowerCase();
     const cleanPhone = phone.trim().replace(/[^0-9+]/g, '');
-    
-    if (!db.shops[cleanShopId]) {
+    const customerId = `${cleanShopId}-${cleanPhone}`;
+
+    // Verify shop exists
+    const { data: shop } = await supabase
+      .from('shops')
+      .select('id')
+      .eq('id', cleanShopId)
+      .maybeSingle();
+
+    if (!shop) {
       throw new Error(`Shop "${cleanShopId}" does not exist.`);
     }
 
@@ -438,55 +589,63 @@ module.exports = {
       throw new Error('Invalid phone number.');
     }
 
-    const customerId = `${cleanShopId}-${cleanPhone}`;
-    const existingCustomer = db.customers[customerId];
+    // Get customer
+    const customer = await this.getCustomer(customerId);
     
-    if (existingCustomer) {
-      // Update name if a new one is provided during re-auth
+    if (customer) {
       if (name && name.trim()) {
-        existingCustomer.name = name.trim();
-        await writeDb(db);
+        const { error: updErr } = await supabase
+          .from('customers')
+          .update({ name: name.trim() })
+          .eq('id', customerId);
+        if (updErr) throw new Error(updErr.message);
+        customer.name = name.trim();
       }
-      return { customer: existingCustomer, isNew: false };
+      return { customer, isNew: false };
     }
 
-    // Customer does not exist.
-    // If name is not provided, indicate they are new so the UI prompts for name
+    // Customer does not exist
     if (!name || !name.trim()) {
       return { customer: null, isNew: true };
     }
 
-    // Create new customer with the welcome bonus points
-    const newCustomer = {
-      id: customerId,
-      shopId: cleanShopId,
-      phone: cleanPhone,
-      name: name.trim(),
-      points: 1,
-      redemptions: [],
-      pendingRedeem: null,
-      createdAt: new Date().toISOString()
-    };
+    // Create new customer with welcome bonus (1 point)
+    const { error: insErr } = await supabase
+      .from('customers')
+      .insert({
+        id: customerId,
+        shop_id: cleanShopId,
+        phone: cleanPhone,
+        name: name.trim(),
+        points: 1,
+        created_at: new Date().toISOString()
+      });
 
-    db.customers[customerId] = newCustomer;
-    await writeDb(db);
+    if (insErr) throw new Error(insErr.message);
+
+    const newCustomer = await this.getCustomer(customerId);
     return { customer: newCustomer, isNew: false };
   },
 
   async addCustomerPoint(customerId) {
-    const db = await readDb();
-    if (!db.customers[customerId]) {
+    const customer = await this.getCustomer(customerId);
+    if (!customer) {
       throw new Error('Customer not found.');
     }
 
-    db.customers[customerId].points += 1;
-    await writeDb(db);
-    return db.customers[customerId];
+    const newPoints = (customer.points || 0) + 1;
+    const { error } = await supabase
+      .from('customers')
+      .update({ points: newPoints })
+      .eq('id', customerId);
+
+    if (error) throw new Error(error.message);
+    customer.points = newPoints;
+    return customer;
   },
 
   async createPendingRedeem(customerId, maxPoints) {
-    const db = await readDb();
-    const customer = db.customers[customerId];
+    const customer = await this.getCustomer(customerId);
     if (!customer) {
       throw new Error('Customer not found.');
     }
@@ -494,33 +653,44 @@ module.exports = {
       throw new Error(`Insufficient points. Requires ${maxPoints} points to redeem.`);
     }
 
-    // Generate random 4-digit code
     const code = Math.floor(1000 + Math.random() * 9000).toString();
+    const timestamp = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('customers')
+      .update({
+        pending_redeem_code: code,
+        pending_redeem_points_required: maxPoints,
+        pending_redeem_created_at: timestamp
+      })
+      .eq('id', customerId);
+
+    if (error) throw new Error(error.message);
+    
     customer.pendingRedeem = {
       code,
       pointsRequired: maxPoints,
-      createdAt: new Date().toISOString()
+      createdAt: timestamp
     };
-
-    await writeDb(db);
     return customer;
   },
 
   async cancelPendingRedeem(customerId) {
-    const db = await readDb();
-    const customer = db.customers[customerId];
-    if (!customer) {
-      throw new Error('Customer not found.');
-    }
+    const { error } = await supabase
+      .from('customers')
+      .update({
+        pending_redeem_code: null,
+        pending_redeem_points_required: null,
+        pending_redeem_created_at: null
+      })
+      .eq('id', customerId);
 
-    customer.pendingRedeem = null;
-    await writeDb(db);
-    return customer;
+    if (error) throw new Error(error.message);
+    return this.getCustomer(customerId);
   },
 
   async confirmRedemptionDirect(customerId, code) {
-    const db = await readDb();
-    const customer = db.customers[customerId];
+    const customer = await this.getCustomer(customerId);
     if (!customer) {
       throw new Error('Customer not found.');
     }
@@ -533,229 +703,261 @@ module.exports = {
       throw new Error('Insufficient points balance.');
     }
 
-    // Deduct points and push history
-    customer.points -= pointsToRedeem;
-    if (!customer.redemptions) customer.redemptions = [];
-    customer.redemptions.push({
-      code,
-      pointsRedeemed: pointsToRedeem,
-      redeemedAt: new Date().toISOString()
-    });
-    customer.pendingRedeem = null;
+    const newPoints = customer.points - pointsToRedeem;
 
-    await writeDb(db);
-    return customer;
+    // Deduct points and clear code
+    const { error: updErr } = await supabase
+      .from('customers')
+      .update({
+        points: newPoints,
+        pending_redeem_code: null,
+        pending_redeem_points_required: null,
+        pending_redeem_created_at: null
+      })
+      .eq('id', customerId);
+
+    if (updErr) throw new Error(updErr.message);
+
+    // Insert redemption log
+    const { error: logErr } = await supabase
+      .from('customer_redemptions')
+      .insert({
+        customer_id: customerId,
+        code,
+        points_redeemed: pointsToRedeem,
+        redeemed_at: new Date().toISOString()
+      });
+
+    if (logErr) throw new Error(logErr.message);
+
+    return this.getCustomer(customerId);
   },
 
   async confirmRedemptionByCode(shopId, code) {
-    const db = await readDb();
     const cleanShopId = shopId.toLowerCase();
     
-    // Find customer in this shop with matching active code
-    const customer = Object.values(db.customers).find(c => 
-      c.shopId === cleanShopId && 
-      c.pendingRedeem && 
-      c.pendingRedeem.code === code
-    );
+    // Find customer in this shop with active matching code
+    const { data: customerRow, error: custErr } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('shop_id', cleanShopId)
+      .eq('pending_redeem_code', code)
+      .maybeSingle();
 
-    if (!customer) {
+    if (custErr || !customerRow) {
       throw new Error(`No pending redemption found with code "${code}" at this shop.`);
     }
 
-    const pointsToRedeem = customer.pendingRedeem.pointsRequired;
-    customer.points -= pointsToRedeem;
-    if (!customer.redemptions) customer.redemptions = [];
-    customer.redemptions.push({
-      code,
-      pointsRedeemed: pointsToRedeem,
-      redeemedAt: new Date().toISOString()
-    });
-    customer.pendingRedeem = null;
+    const pointsToRedeem = customerRow.pending_redeem_points_required;
+    const newPoints = customerRow.points - pointsToRedeem;
 
-    await writeDb(db);
-    return customer;
+    // Deduct points and clear code
+    await supabase
+      .from('customers')
+      .update({
+        points: newPoints,
+        pending_redeem_code: null,
+        pending_redeem_points_required: null,
+        pending_redeem_created_at: null
+      })
+      .eq('id', customerRow.id);
+
+    // Record redemption
+    await supabase
+      .from('customer_redemptions')
+      .insert({
+        customer_id: customerRow.id,
+        code,
+        points_redeemed: pointsToRedeem,
+        redeemed_at: new Date().toISOString()
+      });
+
+    return this.getCustomer(customerRow.id);
   },
 
   async getRedemptionsByShop(shopId) {
-    const db = await readDb();
     const cleanShopId = shopId.toLowerCase();
-    const shopCustomers = Object.values(db.customers).filter(c => c.shopId === cleanShopId);
     
-    const history = [];
-    shopCustomers.forEach(cust => {
-      const redemptions = cust.redemptions || [];
-      redemptions.forEach(r => {
-        history.push({
-          customerId: cust.id,
-          customerName: cust.name,
-          customerPhone: cust.phone,
-          code: r.code,
-          pointsRedeemed: r.pointsRedeemed,
-          redeemedAt: r.redeemedAt
-        });
-      });
-    });
+    // Join redemptions on customers to filter by shop
+    const { data: rows, error } = await supabase
+      .from('customer_redemptions')
+      .select('code, points_redeemed, redeemed_at, customers!inner(id, name, phone)')
+      .eq('customers.shop_id', cleanShopId)
+      .order('redeemed_at', { ascending: false });
 
-    // Sort descending (newest claims first)
-    return history.sort((a, b) => new Date(b.redeemedAt) - new Date(a.redeemedAt));
+    if (error || !rows) return [];
+
+    return rows.map(r => ({
+      customerId: r.customers.id,
+      customerName: r.customers.name,
+      customerPhone: r.customers.phone,
+      code: r.code,
+      pointsRedeemed: r.points_redeemed,
+      redeemedAt: r.redeemed_at
+    }));
   },
 
   async getAllShopsFull() {
-    const db = await readDb();
-    return Object.values(db.shops).map(shop => {
-      if (!shop.ownerUsername) shop.ownerUsername = 'admin';
-      if (!shop.ownerPassword) shop.ownerPassword = 'admin';
-      shop.isSuspended = this.isShopSuspended(shop, db);
-      return shop;
-    });
+    const { data: shopRows, error } = await supabase
+      .from('shops')
+      .select('*');
+
+    if (error || !shopRows) return [];
+
+    const fullShops = [];
+    for (const row of shopRows) {
+      const shop = mapShopRowToApp(row);
+      shop.isSuspended = await this.isShopSuspended(shop);
+      fullShops.push(shop);
+    }
+    return fullShops;
   },
 
   async suspendShop(slug, isSuspended) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase();
-    if (!db.shops[cleanSlug]) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
-    db.shops[cleanSlug].isSuspended = !!isSuspended;
-    await writeDb(db);
-    return db.shops[cleanSlug];
+    const { error } = await supabase
+      .from('shops')
+      .update({ is_suspended: !!isSuspended })
+      .eq('id', cleanSlug);
+
+    if (error) throw new Error(error.message);
+    return this.getShop(cleanSlug);
   },
 
   async updateShopSubscriptionMethod(slug, method) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase();
-    const shop = db.shops[cleanSlug];
-    if (!shop) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
     const validMethods = ['onetime_daily', 'monthly', 'per_stamp'];
     if (!validMethods.includes(method)) {
       throw new Error(`Invalid subscription plan method: ${method}`);
     }
-    shop.subscriptionMethod = method;
-    await writeDb(db);
-    return shop;
+
+    const { error } = await supabase
+      .from('shops')
+      .update({ subscription_method: method })
+      .eq('id', cleanSlug);
+
+    if (error) throw new Error(error.message);
+    return this.getShop(cleanSlug);
   },
 
   async deleteShop(slug) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase();
-    if (!db.shops[cleanSlug]) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
-    // Delete shop
-    delete db.shops[cleanSlug];
-    // Delete associated customers
-    const updatedCustomers = {};
-    Object.keys(db.customers).forEach(custId => {
-      const cust = db.customers[custId];
-      if (cust.shopId !== cleanSlug) {
-        updatedCustomers[custId] = cust;
-      }
-    });
-    db.customers = updatedCustomers;
-    await writeDb(db);
+    const { error } = await supabase
+      .from('shops')
+      .delete()
+      .eq('id', cleanSlug);
+
+    if (error) throw new Error(error.message);
     return true;
   },
 
-  async updateShopDetails(slug, { name, rule, ownerUsername, ownerPassword }) {
-    const db = await readDb();
+  async updateShopDetails(slug, { name, rule, ownerUsername, ownerPassword, trialExtensionDays }) {
     const cleanSlug = slug.toLowerCase();
-    const shop = db.shops[cleanSlug];
-    if (!shop) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
-    if (name) shop.name = name.trim();
-    if (ownerUsername) shop.ownerUsername = ownerUsername.trim();
-    if (ownerPassword) shop.ownerPassword = ownerPassword.trim();
+    const updates = {};
+    if (name) updates.name = name.trim();
+    if (ownerUsername) updates.owner_username = ownerUsername.trim();
+    if (ownerPassword) updates.owner_password = ownerPassword.trim();
+    if (trialExtensionDays !== undefined) updates.trial_extension_days = parseInt(trialExtensionDays) || 0;
     
     if (rule) {
-      shop.rule = rule.trim();
-      const pointsRequired = parseInt(shop.rule.match(/\d+/)?.[0]) || 10;
-      const rewardText = shop.rule.replace(/^\d+\s*(stamps|points)?\s*=\s*/i, '').trim() || '1 free item';
+      updates.rule = rule.trim();
+      const pointsRequired = parseInt(updates.rule.match(/\d+/)?.[0]) || 10;
+      const rewardText = updates.rule.replace(/^\d+\s*(stamps|points)?\s*=\s*/i, '').trim() || '1 free item';
       
-      if (shop.rewards) {
-        const activeReward = shop.rewards.find(r => r.isActive);
+      const { data: rewards } = await supabase
+        .from('shop_rewards')
+        .select('*')
+        .eq('shop_id', cleanSlug);
+
+      if (rewards && rewards.length > 0) {
+        const activeReward = rewards.find(r => r.is_active);
         if (activeReward) {
-          activeReward.pointsRequired = pointsRequired;
-          activeReward.rewardText = rewardText;
-        } else if (shop.rewards.length > 0) {
-          shop.rewards[0].isActive = true;
-          shop.rewards[0].pointsRequired = pointsRequired;
-          shop.rewards[0].rewardText = rewardText;
+          await supabase
+            .from('shop_rewards')
+            .update({
+              points_required: pointsRequired,
+              reward_text: rewardText
+            })
+            .eq('id', activeReward.id);
         } else {
-          shop.rewards.push({
-            id: 'reward-default',
-            pointsRequired,
-            rewardText,
-            isActive: true
-          });
+          await supabase
+            .from('shop_rewards')
+            .update({
+              points_required: pointsRequired,
+              reward_text: rewardText,
+              is_active: true
+            })
+            .eq('id', rewards[0].id);
         }
+      } else {
+        await supabase
+          .from('shop_rewards')
+          .insert({
+            id: 'reward-default',
+            shop_id: cleanSlug,
+            points_required: pointsRequired,
+            reward_text: rewardText,
+            is_active: true
+          });
       }
     }
-    await writeDb(db);
-    return shop;
+
+    if (Object.keys(updates).length > 0) {
+      const { error } = await supabase
+        .from('shops')
+        .update(updates)
+        .eq('id', cleanSlug);
+      if (error) throw new Error(error.message);
+    }
+
+    return this.getShop(cleanSlug);
   },
 
+  // Settings Methods
   async getGlobalSettings() {
-    const db = await readDb();
-    if (!db.settings) {
-      db.settings = {};
+    const { data: settingsRow, error } = await supabase
+      .from('global_settings')
+      .select('*')
+      .eq('id', 1)
+      .maybeSingle();
+
+    if (error || !settingsRow) {
+      // Fallback
+      return mapSettingsRowToApp({
+        id: 1,
+        payment_instructions: 'Scan the GCash QR code below to settle your platform subscription fee.',
+        subscription_method: 'onetime_daily'
+      });
     }
-    if (!db.settings.paymentInstructions) {
-      db.settings.paymentInstructions = 'Scan the GCash QR code below to settle your platform subscription fee.';
-    }
-    if (!db.settings.subscriptionMethod) {
-      db.settings.subscriptionMethod = 'onetime_daily';
-    }
-    if (db.settings.systemDeveloperFee === undefined) {
-      db.settings.systemDeveloperFee = db.settings.onetimeSetupFee !== undefined ? db.settings.onetimeSetupFee : 5000;
-    }
-    if (db.settings.onetimeSetupFee === undefined) {
-      db.settings.onetimeSetupFee = db.settings.systemDeveloperFee;
-    }
-    if (db.settings.dailyFee === undefined) {
-      db.settings.dailyFee = 50;
-    }
-    if (db.settings.monthlyFee === undefined) {
-      db.settings.monthlyFee = 1500;
-    }
-    if (db.settings.perStampFee === undefined) {
-      db.settings.perStampFee = 1;
-    }
-    if (db.settings.perStampDeveloperFee === undefined) {
-      db.settings.perStampDeveloperFee = 3000;
-    }
-    await writeDb(db);
-    return db.settings;
+
+    return mapSettingsRowToApp(settingsRow);
   },
 
   async updateGlobalSettings({ paymentQr, paymentInstructions, subscriptionMethod, systemDeveloperFee, dailyFee, monthlyFee, perStampDeveloperFee, perStampFee }) {
-    const db = await readDb();
-    if (!db.settings) {
-      db.settings = {};
-    }
-    if (paymentQr !== undefined) db.settings.paymentQr = paymentQr;
-    if (paymentInstructions !== undefined) db.settings.paymentInstructions = paymentInstructions;
-    if (subscriptionMethod !== undefined) db.settings.subscriptionMethod = subscriptionMethod;
-    if (systemDeveloperFee !== undefined) {
-      db.settings.systemDeveloperFee = parseFloat(systemDeveloperFee) || 0;
-      db.settings.onetimeSetupFee = db.settings.systemDeveloperFee; // Sync setup fee for compatibility
-    }
-    if (dailyFee !== undefined) db.settings.dailyFee = parseFloat(dailyFee) || 0;
-    if (monthlyFee !== undefined) db.settings.monthlyFee = parseFloat(monthlyFee) || 0;
-    if (perStampDeveloperFee !== undefined) db.settings.perStampDeveloperFee = parseFloat(perStampDeveloperFee) || 0;
-    if (perStampFee !== undefined) db.settings.perStampFee = parseFloat(perStampFee) || 0;
-    await writeDb(db);
-    return db.settings;
+    const updates = {};
+    if (paymentQr !== undefined) updates.payment_qr = paymentQr;
+    if (paymentInstructions !== undefined) updates.payment_instructions = paymentInstructions;
+    if (subscriptionMethod !== undefined) updates.subscription_method = subscriptionMethod;
+    if (systemDeveloperFee !== undefined) updates.system_developer_fee = parseFloat(systemDeveloperFee) || 0;
+    if (dailyFee !== undefined) updates.daily_fee = parseFloat(dailyFee) || 0;
+    if (monthlyFee !== undefined) updates.monthly_fee = parseFloat(monthlyFee) || 0;
+    if (perStampDeveloperFee !== undefined) updates.per_stamp_developer_fee = parseFloat(perStampDeveloperFee) || 0;
+    if (perStampFee !== undefined) updates.per_stamp_fee = parseFloat(perStampFee) || 0;
+
+    const { error } = await supabase
+      .from('global_settings')
+      .update(updates)
+      .eq('id', 1);
+
+    if (error) throw new Error(error.message);
+    return this.getGlobalSettings();
   },
 
-  computeBilling(shop, settings, db) {
+  async computeBilling(shop, settings) {
     const method = shop.subscriptionMethod || settings.subscriptionMethod || 'onetime_daily';
+    const now = new Date();
     
-    // Check if subscriptionStartDate is set (verified paid plan)
     if (shop.subscriptionStartDate) {
-      const now = new Date();
       const cycleInfo = getBillingCycles(shop.subscriptionStartDate, now);
       const completed = cycleInfo.completed;
       const ongoing = cycleInfo.ongoing;
@@ -763,10 +965,10 @@ module.exports = {
       let totalBilledDues = 0;
       let cycleBreakdowns = [];
       
-      // 1. Setup Developer Fee (One-time)
+      // 1. Setup Developer Fee
       let developerFee = 0;
       if (method === 'onetime_daily') {
-        developerFee = parseFloat(settings.systemDeveloperFee) || parseFloat(settings.onetimeSetupFee) || 0;
+        developerFee = parseFloat(settings.systemDeveloperFee) || 0;
         totalBilledDues += developerFee;
         cycleBreakdowns.push(`System Developer Fee: ₱${developerFee.toLocaleString()} (One-time)`);
       } else if (method === 'monthly') {
@@ -777,8 +979,9 @@ module.exports = {
         cycleBreakdowns.push(`System Developer Fee: ₱${developerFee.toLocaleString()} (One-time)`);
       }
       
-      // 2. Completed billing cycles dues
-      completed.forEach((c, idx) => {
+      // 2. Completed billing cycles
+      for (let idx = 0; idx < completed.length; idx++) {
+        const c = completed[idx];
         const cycleDays = Math.ceil((c.end - c.start) / (1000 * 60 * 60 * 24));
         const cycleNum = idx + 1;
         
@@ -792,14 +995,14 @@ module.exports = {
           totalBilledDues += cycleFee;
           cycleBreakdowns.push(`SOA #${cycleNum} (${formatDateShort(c.start)} to ${formatDateShort(c.end)}): ₱${cycleFee.toLocaleString()} (Flat Monthly) - Released: ${formatDateShort(c.soaDate)}, Due: ${formatDateShort(c.dueDate)}`);
         } else if (method === 'per_stamp') {
-          const stampsInCycle = countStampsInPeriod(c.start, c.end, shop.id, db);
+          const stampsInCycle = await countStampsInPeriod(c.start, c.end, shop.id);
           cycleFee = stampsInCycle * (parseFloat(settings.perStampFee) || 0);
           totalBilledDues += cycleFee;
           cycleBreakdowns.push(`SOA #${cycleNum} (${formatDateShort(c.start)} to ${formatDateShort(c.end)}): ₱${cycleFee.toLocaleString()} (${stampsInCycle} stamp(s) * ₱${settings.perStampFee}) - Released: ${formatDateShort(c.soaDate)}, Due: ${formatDateShort(c.dueDate)}`);
         }
-      });
+      }
       
-      // 3. Ongoing active cycle unbilled usage
+      // 3. Ongoing active cycle unbilled
       const ongoingDays = Math.max(0, Math.floor((now - ongoing.start) / (1000 * 60 * 60 * 24)));
       let ongoingFee = 0;
       let ongoingLabel = '';
@@ -810,20 +1013,17 @@ module.exports = {
         ongoingFee = 0;
         ongoingLabel = `Current Cycle (${formatDateShort(ongoing.start)} to present): ₱0 (Flat Monthly billed on cycle end) - Next SOA: ${formatDateShort(ongoing.end)}`;
       } else if (method === 'per_stamp') {
-        const stampsInOngoing = countStampsInPeriod(ongoing.start, now, shop.id, db);
+        const stampsInOngoing = await countStampsInPeriod(ongoing.start, now, shop.id);
         ongoingFee = stampsInOngoing * (parseFloat(settings.perStampFee) || 0);
         ongoingLabel = `Current Cycle Stamp Usage (${formatDateShort(ongoing.start)} to present): ₱${ongoingFee.toLocaleString()} (${stampsInOngoing} stamp(s) * ₱${settings.perStampFee}) - Next SOA: ${formatDateShort(ongoing.end)}`;
       }
       
       const accumulatedFee = totalBilledDues + ongoingFee;
       
-      // Calculate totalPaid
       let totalPaid = 0;
       if (shop.payments && shop.payments.length > 0) {
         shop.payments.forEach(p => {
-          if (p.status === 'confirmed') {
-            totalPaid += p.amount;
-          }
+          if (p.status === 'confirmed') totalPaid += p.amount;
         });
       } else {
         totalPaid = shop.totalPaid || 0;
@@ -835,7 +1035,7 @@ module.exports = {
       // Calculate isOverdue
       let isOverdue = false;
       let runningBilled = developerFee;
-      completed.forEach(c => {
+      for (const c of completed) {
         let cycleFee = 0;
         const cycleDays = Math.ceil((c.end - c.start) / (1000 * 60 * 60 * 24));
         if (method === 'onetime_daily') {
@@ -843,16 +1043,15 @@ module.exports = {
         } else if (method === 'monthly') {
           cycleFee = parseFloat(settings.monthlyFee) || 0;
         } else if (method === 'per_stamp') {
-          const stampsInCycle = countStampsInPeriod(c.start, c.end, shop.id, db);
+          const stampsInCycle = await countStampsInPeriod(c.start, c.end, shop.id);
           cycleFee = stampsInCycle * (parseFloat(settings.perStampFee) || 0);
         }
         
         runningBilled += cycleFee;
-        
         if (now > c.dueDate && totalPaid < runningBilled) {
           isOverdue = true;
         }
-      });
+      }
       
       const methodLabel = method === 'onetime_daily' 
         ? 'Daily Active Plan (Billed Monthly)' 
@@ -880,7 +1079,7 @@ module.exports = {
       };
     }
     
-    // Fallback: If subscriptionStartDate is NOT set yet (e.g. trial active or trial expired pre-payment)
+    // Fallback: If subscriptionStartDate is NOT set yet
     const createdTime = shop.createdAt ? new Date(shop.createdAt).getTime() : Date.now();
     const msActive = Date.now() - createdTime;
     const daysActive = Math.max(1, Math.ceil(msActive / (1000 * 60 * 60 * 24)));
@@ -889,15 +1088,16 @@ module.exports = {
     let breakdown = '';
     let accumulatedFee = 0;
     
-    if (daysActive <= 7 && (!shop.subscriptionMethod || shop.subscriptionMethod === 'trial')) {
-      methodLabel = 'Basic Subscription (7-Day Free Trial)';
-      const remainingDays = 7 - Math.floor(msActive / (1000 * 60 * 60 * 24));
+    const trialDays = 7 + (shop.trialExtensionDays || 0);
+    if (daysActive <= trialDays && (!shop.subscriptionMethod || shop.subscriptionMethod === 'trial')) {
+      methodLabel = `Basic Subscription (${trialDays}-Day Free Trial)`;
+      const remainingDays = trialDays - Math.floor(msActive / (1000 * 60 * 60 * 24));
       breakdown = `Free trial active. Expires in ${Math.max(0, remainingDays)} day(s).`;
       accumulatedFee = 0;
     } else {
-      const activeDays = Math.max(0, daysActive - 7);
+      const activeDays = Math.max(0, daysActive - trialDays);
       if (method === 'onetime_daily') {
-        const developerFee = parseFloat(settings.systemDeveloperFee) || parseFloat(settings.onetimeSetupFee) || 0;
+        const developerFee = parseFloat(settings.systemDeveloperFee) || 0;
         const dailyFee = parseFloat(settings.dailyFee) || 0;
         methodLabel = 'System Developer Fee + Daily Fee';
         breakdown = `System Developer Fee: ₱${developerFee.toLocaleString()} (One-time) + Daily Fee: ₱${dailyFee} (${activeDays} day(s) active on paid plan)`;
@@ -912,17 +1112,8 @@ module.exports = {
         const perStampFee = parseFloat(settings.perStampFee) || 0;
         const developerFee = parseFloat(settings.perStampDeveloperFee) || 0;
         
-        const cleanShopId = shop.id.toLowerCase();
-        const customers = Object.values(db.customers || {}).filter(c => c.shopId === cleanShopId);
+        const totalStamps = await countTotalStamps(shop.id);
         
-        let totalStamps = 0;
-        customers.forEach(c => {
-          totalStamps += c.points || 0;
-          const redemptions = c.redemptions || [];
-          redemptions.forEach(r => {
-            totalStamps += r.pointsRedeemed || 0;
-          });
-        });
         methodLabel = 'Pay-As-You-Go per Stamp';
         breakdown = `System Developer Fee: ₱${developerFee.toLocaleString()} (One-time) + Fee per Stamp: ₱${perStampFee.toLocaleString()} (${totalStamps} stamp(s) issued)`;
         accumulatedFee = developerFee + (totalStamps * perStampFee);
@@ -932,9 +1123,7 @@ module.exports = {
     let totalPaid = 0;
     if (shop.payments && shop.payments.length > 0) {
       shop.payments.forEach(p => {
-        if (p.status === 'confirmed') {
-          totalPaid += p.amount;
-        }
+        if (p.status === 'confirmed') totalPaid += p.amount;
       });
     } else {
       totalPaid = shop.totalPaid || 0;
@@ -956,158 +1145,194 @@ module.exports = {
   },
 
   async getShopBillingSummary(slug) {
-    const db = await readDb();
-    const cleanSlug = slug.toLowerCase();
-    const shop = db.shops[cleanSlug];
-    if (!shop) throw new Error(`Shop "${cleanSlug}" not found.`);
+    const shop = await this.getShop(slug);
+    if (!shop) throw new Error(`Shop "${slug}" not found.`);
     
-    if (!shop.createdAt) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      shop.createdAt = yesterday.toISOString();
-    }
-    if (shop.totalPaid === undefined) {
-      shop.totalPaid = 0;
-    }
-    if (!shop.payments) {
-      shop.payments = [];
-    }
-    
-    const settings = db.settings || { subscriptionMethod: 'onetime_daily' };
-    return this.computeBilling(shop, settings, db);
+    const settings = await this.getGlobalSettings();
+    return this.computeBilling(shop, settings);
   },
 
   async recordShopPayment(slug, amount, referenceNumber, receiptImage) {
-    const db = await readDb();
     const cleanSlug = slug.toLowerCase();
-    const shop = db.shops[cleanSlug];
-    if (!shop) {
-      throw new Error(`Shop "${cleanSlug}" not found.`);
-    }
     const pAmount = parseFloat(amount);
     if (isNaN(pAmount) || pAmount <= 0) {
       throw new Error('Payment amount must be a positive number.');
     }
-    if (!shop.payments) {
-      shop.payments = [];
-    }
 
     const ref = referenceNumber ? String(referenceNumber).trim() : `REF-IMG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newPayment = {
-      id: `receipt-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
-      amount: pAmount,
-      referenceNumber: ref,
-      receiptImage: receiptImage || null,
-      timestamp: new Date().toISOString(),
-      status: 'pending',
-      verifiedAt: null
-    };
+    const paymentId = `receipt-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    shop.payments.push(newPayment);
-    await writeDb(db);
-    return shop;
+    const { error } = await supabase
+      .from('shop_payments')
+      .insert({
+        id: paymentId,
+        shop_id: cleanSlug,
+        amount: pAmount,
+        reference_number: ref,
+        receipt_image: receiptImage || null,
+        timestamp: new Date().toISOString(),
+        status: 'pending',
+        verified_at: null
+      });
+
+    if (error) throw new Error(error.message);
+    return this.getShop(cleanSlug);
   },
 
+  // Notifications Methods
   async addPaymentNotification(shopSlug, amount) {
-    const db = await readDb();
     const cleanSlug = shopSlug.toLowerCase();
-    const shop = db.shops[cleanSlug];
+    
+    // Get shop name
+    const { data: shop } = await supabase
+      .from('shops')
+      .select('name')
+      .eq('id', cleanSlug)
+      .maybeSingle();
+
     const shopName = shop ? shop.name : shopSlug;
+    const notificationId = `notif-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     
-    if (!db.notifications) {
-      db.notifications = [];
+    const { error } = await supabase
+      .from('payment_notifications')
+      .insert({
+        id: notificationId,
+        shop_slug: cleanSlug,
+        shop_name: shopName,
+        amount: parseFloat(amount),
+        timestamp: new Date().toISOString(),
+        read: false
+      });
+
+    if (error) throw new Error(error.message);
+
+    // Enforce 50 notifications limit by deleting older ones
+    const { data: totalNotifications } = await supabase
+      .from('payment_notifications')
+      .select('id')
+      .order('timestamp', { ascending: false });
+
+    if (totalNotifications && totalNotifications.length > 50) {
+      const keepIds = totalNotifications.slice(0, 50).map(n => n.id);
+      await supabase
+        .from('payment_notifications')
+        .delete()
+        .not('id', 'in', `(${keepIds.join(',')})`);
     }
-    
-    const newNotification = {
-      id: `notif-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+
+    return {
+      id: notificationId,
       shopSlug: cleanSlug,
-      shopName: shopName,
+      shopName,
       amount: parseFloat(amount),
       timestamp: new Date().toISOString(),
       read: false
     };
-    
-    db.notifications.unshift(newNotification);
-    
-    if (db.notifications.length > 50) {
-      db.notifications = db.notifications.slice(0, 50);
-    }
-    
-    await writeDb(db);
-    return newNotification;
   },
 
   async getPaymentNotifications() {
-    const db = await readDb();
-    return db.notifications || [];
+    const { data: notifications, error } = await supabase
+      .from('payment_notifications')
+      .select('*')
+      .order('timestamp', { ascending: false });
+
+    if (error || !notifications) return [];
+    return notifications.map(mapNotificationRowToApp);
   },
 
   async markNotificationsAsRead() {
-    const db = await readDb();
-    if (db.notifications) {
-      db.notifications.forEach(n => n.read = true);
-      await writeDb(db);
-    }
-    return db.notifications || [];
+    await supabase
+      .from('payment_notifications')
+      .update({ read: true })
+      .eq('read', false);
+
+    return this.getPaymentNotifications();
   },
 
   async clearNotifications() {
-    const db = await readDb();
-    db.notifications = [];
-    await writeDb(db);
+    await supabase
+      .from('payment_notifications')
+      .delete()
+      .neq('id', ''); // Clear all
+
     return [];
   },
 
   async getAllPayments() {
-    const db = await readDb();
-    const all = [];
-    Object.values(db.shops).forEach(shop => {
-      const payments = shop.payments || [];
-      payments.forEach(p => {
-        all.push({
-          ...p,
-          shopId: shop.id,
-          shopName: shop.name
-        });
-      });
-    });
-    return all.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    // Join payments on shops to fetch name
+    const { data: rows, error } = await supabase
+      .from('shop_payments')
+      .select('id, amount, reference_number, receipt_image, timestamp, status, verified_at, shops(id, name)')
+      .order('timestamp', { ascending: false });
+
+    if (error || !rows) return [];
+
+    return rows.map(r => ({
+      id: r.id,
+      amount: r.amount ? parseFloat(r.amount) : 0,
+      referenceNumber: r.reference_number,
+      receiptImage: r.receipt_image,
+      timestamp: r.timestamp,
+      status: r.status,
+      verifiedAt: r.verified_at,
+      shopId: r.shops.id,
+      shopName: r.shops.name
+    }));
   },
 
   async confirmPayment(paymentId) {
-    const db = await readDb();
-    let foundPayment = null;
-    let targetShop = null;
+    // Get target payment
+    const { data: paymentRow, error: pErr } = await supabase
+      .from('shop_payments')
+      .select('*, shops(*)')
+      .eq('id', paymentId)
+      .maybeSingle();
 
-    Object.values(db.shops).forEach(shop => {
-      const payments = shop.payments || [];
-      const payment = payments.find(p => p.id === paymentId);
-      if (payment) {
-        foundPayment = payment;
-        targetShop = shop;
-      }
-    });
-
-    if (!foundPayment) {
+    if (pErr || !paymentRow) {
       throw new Error(`Payment request with ID "${paymentId}" not found.`);
     }
 
-    foundPayment.status = 'confirmed';
-    foundPayment.verifiedAt = new Date().toISOString();
+    const newVerifiedAt = new Date().toISOString();
+    
+    // Update payment status
+    await supabase
+      .from('shop_payments')
+      .update({
+        status: 'confirmed',
+        verified_at: newVerifiedAt
+      })
+      .eq('id', paymentId);
 
-    if (targetShop.totalPaid === undefined) {
-      targetShop.totalPaid = 0;
+    // Update totalPaid on shop
+    const shop = paymentRow.shops;
+    const currentPaid = shop.total_paid ? parseFloat(shop.total_paid) : 0;
+    const newPaid = currentPaid + parseFloat(paymentRow.amount);
+
+    const shopUpdates = { total_paid: newPaid };
+    
+    if (!shop.subscription_start_date && shop.subscription_method && shop.subscription_method !== 'trial') {
+      shopUpdates.subscription_start_date = new Date().toISOString();
     }
-    targetShop.totalPaid += foundPayment.amount;
 
-    if (!targetShop.subscriptionStartDate && targetShop.subscriptionMethod && targetShop.subscriptionMethod !== 'trial') {
-      targetShop.subscriptionStartDate = new Date().toISOString();
-    }
+    await supabase
+      .from('shops')
+      .update(shopUpdates)
+      .eq('id', shop.id);
 
-    await writeDb(db);
+    const updatedShop = await this.getShop(shop.id);
+    const updatedPayment = {
+      id: paymentRow.id,
+      amount: parseFloat(paymentRow.amount),
+      referenceNumber: paymentRow.reference_number,
+      receiptImage: paymentRow.receipt_image,
+      timestamp: paymentRow.timestamp,
+      status: 'confirmed',
+      verifiedAt: newVerifiedAt
+    };
+
     return {
-      payment: foundPayment,
-      shop: targetShop
+      payment: updatedPayment,
+      shop: updatedShop
     };
   }
 };

@@ -113,6 +113,17 @@
           </div>
         </div>
 
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="editTrialExtension">Trial Extension (Days)</label>
+          <input 
+            type="number" 
+            id="editTrialExtension" 
+            min="0"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 font-mono"
+            required
+          >
+        </div>
+
         <div class="flex gap-3 pt-2">
           <button 
             type="button" 
@@ -243,7 +254,8 @@
                   <th class="py-3 px-3">Shop Info</th>
                   <th class="py-3 px-3">Date Joined</th>
                   <th class="py-3 px-3">Active Rule</th>
-                  <th class="py-3 px-3">Manager Credentials</th>
+                  <th class="py-3 px-3">Trial Status</th>
+                  <th class="py-3 px-3 font-mono">Manager Credentials</th>
                   <th class="py-3 px-3 text-center">Status</th>
                   <th class="py-3 px-3 text-right">Actions</th>
                 </tr>
@@ -538,6 +550,7 @@
     const editShopRule = document.getElementById('editShopRule');
     const editOwnerUser = document.getElementById('editOwnerUser');
     const editOwnerPass = document.getElementById('editOwnerPass');
+    const editTrialExtension = document.getElementById('editTrialExtension');
 
     // Billing settings Elements
     const billingForm = document.getElementById('billingForm');
@@ -808,6 +821,26 @@
           ? new Date(shop.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
           : 'N/A';
         
+        let trialStatusHtml = '';
+        if (shop.billingSummary) {
+          if (shop.billingSummary.method === 'trial') {
+            const trialDays = 7 + (shop.trialExtensionDays || 0);
+            const remainingDays = Math.max(0, trialDays - (shop.billingSummary.daysActive - 1));
+            trialStatusHtml = `
+              <div class="font-bold text-indigo-400 font-mono">${remainingDays} / ${trialDays} Days Left</div>
+              <div class="text-[9px] text-slate-500 font-sans">Active Free Trial</div>
+              ${shop.trialExtensionDays > 0 ? `<div class="text-[9px] text-indigo-500 font-sans">Extension: +${shop.trialExtensionDays}d</div>` : ''}
+            `;
+          } else {
+            trialStatusHtml = `
+              <div class="font-bold text-emerald-400 text-[10px] uppercase">${shop.billingSummary.methodLabel || 'Paid Plan'}</div>
+              <div class="text-[9px] text-slate-550 font-sans">Dues: ₱${(shop.billingSummary.outstandingBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            `;
+          }
+        } else {
+          trialStatusHtml = `<span class="text-slate-500 font-mono">N/A</span>`;
+        }
+        
         row.innerHTML = `
           <td class="py-3 px-3">
             <div class="text-white font-bold">${shop.name}</div>
@@ -815,6 +848,7 @@
           </td>
           <td class="py-3 px-3 text-slate-400 font-mono">${dateJoined}</td>
           <td class="py-3 px-3 text-slate-400 font-mono">${shop.rule}</td>
+          <td class="py-3 px-3">${trialStatusHtml}</td>
           <td class="py-3 px-3 font-mono">
             <span class="text-slate-500">U:</span> <span class="text-indigo-300 font-semibold">${shop.ownerUsername}</span><br>
             <span class="text-slate-500">P:</span> <span class="text-indigo-300 font-semibold">${shop.ownerPassword}</span>
@@ -898,6 +932,7 @@
       editShopRule.value = shop.rule;
       editOwnerUser.value = shop.ownerUsername;
       editOwnerPass.value = shop.ownerPassword;
+      editTrialExtension.value = shop.trialExtensionDays || 0;
 
       editShopModal.classList.remove('hidden');
     }
@@ -917,7 +952,8 @@
         name: editShopName.value,
         rule: editShopRule.value,
         ownerUsername: editOwnerUser.value,
-        ownerPassword: editOwnerPass.value
+        ownerPassword: editOwnerPass.value,
+        trialExtensionDays: parseInt(editTrialExtension.value) || 0
       };
 
       try {
