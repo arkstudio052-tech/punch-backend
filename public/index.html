@@ -274,7 +274,7 @@
 
   <main class="w-full max-w-5xl flex-grow flex items-center justify-center my-auto px-4">
     <!-- Global Customer Profile Dashboard (shown when customer phone is saved in localStorage) -->
-    <div id="globalProfileView" class="w-full max-w-5xl glass p-8 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo hidden animate-fade-in">
+    <div id="globalProfileView" class="w-full max-w-5xl glass p-4 sm:p-6 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo hidden animate-fade-in">
       <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
       <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -334,13 +334,8 @@
                 Loading stamp cards...
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Role Selection Screen -->
-    <div id="roleSelectionView" class="w-full max-w-md glass p-8 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo animate-fade-in">
+           <!-- Role Selection Screen -->
+    <div id="roleSelectionView" class="w-full max-w-md glass p-4 sm:p-6 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo animate-fade-in">
       <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
       <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -379,46 +374,48 @@
         </div>
         <form id="directLoginForm" onsubmit="handleDirectLogin(event)" class="space-y-3">
           <div id="directPhoneGroup">
-            <div class="flex gap-2">
+            <div class="flex flex-col sm:flex-row gap-2.5">
               <input 
                 type="tel" 
                 id="directPhoneInput" 
                 placeholder="e.g. 09123456789" 
-                class="flex-grow bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-650 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-xs font-mono"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-650 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-xs font-mono"
                 required
               >
               <button 
                 type="submit" 
-                class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4.5 py-2.5 rounded-xl text-xs uppercase tracking-wide cursor-pointer transition-all active:scale-[0.98] shrink-0"
+                class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-3 rounded-xl text-xs uppercase tracking-wide cursor-pointer transition-all active:scale-[0.98] shrink-0 text-center"
               >
                 Log In
               </button>
             </div>
           </div>
           
-          <div id="directNameGroup" class="hidden space-y-2 animate-fade-in">
+          <div id="directNameGroup" class="hidden space-y-2.5 animate-fade-in">
             <p class="text-[10px] text-indigo-400 font-bold">✨ First Time? Enter your name to register your wallet:</p>
-            <div class="flex gap-2">
+            <div class="flex flex-col sm:flex-row gap-2">
               <input 
                 type="text" 
                 id="directNameInput" 
                 placeholder="e.g. Rey Hunter" 
-                class="flex-grow bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-xs"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-650 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-xs"
               >
-              <button 
-                type="button" 
-                onclick="submitDirectNameRegistration()"
-                class="bg-indigo-650 hover:bg-indigo-550 text-white font-bold px-4 rounded-xl text-xs uppercase tracking-wide cursor-pointer transition-all active:scale-[0.98] shrink-0"
-              >
-                Continue
-              </button>
-              <button 
-                type="button" 
-                onclick="cancelDirectNameRegistration()"
-                class="bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 font-bold px-3 rounded-xl text-xs uppercase tracking-wide cursor-pointer transition-all shrink-0"
-              >
-                ✕
-              </button>
+              <div class="flex gap-2 w-full sm:w-auto shrink-0 font-sans">
+                <button 
+                  type="button" 
+                  onclick="submitDirectNameRegistration()"
+                  class="flex-grow sm:flex-none bg-indigo-650 hover:bg-indigo-550 text-white font-bold px-5 py-3 rounded-xl text-xs uppercase tracking-wide cursor-pointer transition-all active:scale-[0.98] text-center"
+                >
+                  Continue
+                </button>
+                <button 
+                  type="button" 
+                  onclick="cancelDirectNameRegistration()"
+                  class="bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-800 font-bold px-4 py-3 rounded-xl text-xs uppercase tracking-wide cursor-pointer transition-all active:scale-[0.98]"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           </div>
         </form>
@@ -450,7 +447,7 @@
     </div>
 
     <!-- Portal Access View (with QR scanning and Manual Slug Entry tabs) -->
-    <div id="scannerView" class="w-full max-w-md hidden glass p-8 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo animate-fade-in">
+    <div id="scannerView" class="w-full max-w-md hidden glass p-4 sm:p-6 rounded-3xl border border-indigo-500/10 space-y-6 shadow-2xl relative overflow-hidden text-center glow-indigo animate-fade-in">
       <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
       <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
 
