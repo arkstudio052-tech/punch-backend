@@ -1826,12 +1826,22 @@
 
     // Action: Directly add stamp from table
     async function addPointDirect(customerId) {
+      const cust = customersList.find(c => c.id === customerId);
+      const custName = cust ? (cust.name || 'Anonymous') : 'this customer';
+      const custPhone = cust ? cust.phone : '';
+      
+      const confirmed = confirm(`Are you sure you want to add 1 stamp to ${custName} (${custPhone})?`);
+      if (!confirmed) return;
+
       try {
         const response = await fetchWithAuth(`/api/customers/${customerId}/add-point`, {
           method: 'POST'
         });
         
-        if (!response.ok) throw new Error('Failed to add stamp');
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to add stamp');
+        
+        alert(`Successfully added 1 stamp to ${result.name || 'Anonymous'} (${result.phone})!`);
         
         // Reload list
         await loadCustomers();
