@@ -165,10 +165,10 @@
             </div>
           </div>
           <button 
-            onclick="signOut()" 
-            class="text-xs text-slate-400 hover:text-slate-300 bg-slate-900/40 hover:bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800 transition-all self-start"
+            onclick="promptStorePin()" 
+            class="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-2.5 py-1.5 rounded-lg border border-indigo-500/20 hover:border-indigo-500/35 transition-all self-start flex items-center gap-1 font-bold shadow-sm"
           >
-            Sign Out
+            🔑 Store PIN
           </button>
         </div>
 
@@ -603,6 +603,33 @@
         } else {
           customerRewardsList.innerHTML = '<p class="text-xs text-slate-500 text-center py-2">No rewards configured.</p>';
         }
+      }
+    }
+
+    async function promptStorePin() {
+      const pin = prompt("Enter 4-digit store PIN to add a stamp:");
+      if (!pin) return;
+      const cleanPin = pin.trim();
+      if (!cleanPin) return;
+
+      try {
+        const response = await fetch(`/api/customers/${customerData.id}/stamp-by-pin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: cleanPin })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to add stamp.');
+        }
+
+        const updatedCustomer = await response.json();
+        customerData = updatedCustomer;
+        alert('Stamp added successfully! 🎉');
+        renderLoyaltyCard();
+      } catch (err) {
+        alert(err.message);
       }
     }
 
