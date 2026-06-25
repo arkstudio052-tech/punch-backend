@@ -662,6 +662,29 @@ module.exports = {
     return customer;
   },
 
+  async stampCustomerByPhoneCode(shopSlug, code) {
+    const cleanSlug = shopSlug.toLowerCase();
+    
+    // Fetch all customers for this shop
+    const { data: rows, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('shop_id', cleanSlug);
+
+    if (error || !rows) {
+      throw new Error('Failed to retrieve store customer records.');
+    }
+
+    const matching = rows.filter(c => c.phone && c.phone.trim().endsWith(code));
+    if (matching.length === 0) {
+      throw new Error(`Customer with stamp code "${code}" not found.`);
+    }
+
+    // Pick first matching customer
+    const targetCustomer = matching[0];
+    return this.addCustomerPoint(targetCustomer.id);
+  },
+
   async createPendingRedeem(customerId, maxPoints) {
     const customer = await this.getCustomer(customerId);
     if (!customer) {

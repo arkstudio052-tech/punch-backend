@@ -164,12 +164,12 @@
               <p class="text-xs text-slate-400 font-semibold pt-0.5">Member: <span id="cardCustomerName" class="text-indigo-400">...</span></p>
             </div>
           </div>
-          <button 
-            onclick="promptStorePin()" 
-            class="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-2.5 py-1.5 rounded-lg border border-indigo-500/20 hover:border-indigo-500/35 transition-all self-start flex items-center gap-1 font-bold shadow-sm"
+          <div 
+            id="customerCardCode"
+            class="text-[13px] text-indigo-400 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/25 font-mono font-black tracking-widest self-start shadow-inner"
           >
-            🔑 Store PIN
-          </button>
+            CODE: 0000
+          </div>
         </div>
 
         <!-- Stamp Grid -->
@@ -472,6 +472,11 @@
       cardShopName.textContent = shopData.name;
       cardShopRule.textContent = shopData.rule;
       document.getElementById('cardCustomerName').textContent = customerData.name || 'Anonymous';
+      const last4 = customerData.phone ? customerData.phone.slice(-4) : '0000';
+      const customerCardCode = document.getElementById('customerCardCode');
+      if (customerCardCode) {
+        customerCardCode.textContent = `CODE: ${last4}`;
+      }
 
       if (shopData.logo) {
         const cardLogoImg = document.getElementById('cardLogoImg');
@@ -532,7 +537,7 @@
         // Display normal point-accumulate QR Code
         const scanUrl = `${window.location.origin}/scan/${customerData.id}`;
         qrCodeImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(scanUrl)}`;
-        customerIdDisplay.textContent = `ID: ${customerData.id}`;
+        customerIdDisplay.textContent = `ID: ${customerData.id} | Code: ${last4}`;
         addStampSection.classList.remove('hidden');
       }
 
@@ -606,32 +611,7 @@
       }
     }
 
-    async function promptStorePin() {
-      const pin = prompt("Enter 4-digit store PIN to add a stamp:");
-      if (!pin) return;
-      const cleanPin = pin.trim();
-      if (!cleanPin) return;
 
-      try {
-        const response = await fetch(`/api/customers/${customerData.id}/stamp-by-pin`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin: cleanPin })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Failed to add stamp.');
-        }
-
-        const updatedCustomer = await response.json();
-        customerData = updatedCustomer;
-        alert('Stamp added successfully! 🎉');
-        renderLoyaltyCard();
-      } catch (err) {
-        alert(err.message);
-      }
-    }
 
     function signOut() {
       localStorage.removeItem(`punch_customer_${shopSlug}`);

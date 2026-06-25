@@ -342,15 +342,16 @@
             <!-- Panel B: Manual Entry -->
             <div id="scannerPanel-manual" class="hidden space-y-4">
               <p class="text-slate-400 text-xs leading-relaxed">
-                Usually, cashiers scan a customer's loyalty QR code. Simulate that here by entering the customer's phone number.
+                Enter the customer's 4-digit stamp code (the last 4 digits of their phone number) to award a stamp.
               </p>
               <form id="scanSimForm" class="space-y-3">
                 <div>
                   <input 
                     type="text" 
                     id="scanPhoneInput" 
-                    placeholder="e.g. 09171234567" 
-                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-650 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono"
+                    placeholder="4-Digit Code (e.g. 2530)" 
+                    maxlength="4"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-655 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono text-center text-lg tracking-widest font-black"
                     required
                   >
                 </div>
@@ -358,7 +359,7 @@
                   type="submit" 
                   class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-sm shadow-md focus:outline-none"
                 >
-                  Add Loyalty Point (+1)
+                  Award Stamp (+1)
                 </button>
               </form>
             </div>
@@ -1841,48 +1842,29 @@
       }
     }
 
-    // Action: Manual scanner simulation form
+    // Action: Manual scanner simulation form (via 4-digit code)
     scanSimForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const phone = scanPhoneInput.value.trim();
-      if (!phone) return;
+      const code = scanPhoneInput.value.trim();
+      if (!code) return;
+
+      if (code.length !== 4 || isNaN(code)) {
+        alert('Please enter a valid 4-digit customer stamp code.');
+        return;
+      }
 
       try {
-        // Authenticate check (phone check first)
-        const checkResponse = await fetch(`/api/shops/${shopSlug}/auth`, {
+        const response = await fetchWithAuth(`/api/shops/${shopSlug}/stamp-by-code`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone })
+          body: JSON.stringify({ code })
         });
         
-        const checkResult = await checkResponse.json();
-        if (!checkResponse.ok) throw new Error(checkResult.error || 'Failed to check customer.');
-
-        let customer = null;
-
-        if (checkResult.isNew) {
-          // Auto-register new walk-in customer with placeholder name
-          const registerResponse = await fetch(`/api/shops/${shopSlug}/auth`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, name: 'Walk-in Customer' })
-          });
-          const registerResult = await registerResponse.json();
-          if (!registerResponse.ok) throw new Error(registerResult.error || 'Failed to auto-register customer.');
-          customer = registerResult.customer;
-        } else {
-          customer = checkResult.customer;
-        }
-
-        // Increment point
-        const pointResponse = await fetchWithAuth(`/api/customers/${customer.id}/add-point`, {
-          method: 'POST'
-        });
-        
-        if (!pointResponse.ok) throw new Error('Failed to award point');
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to award point.');
 
         scanPhoneInput.value = '';
-        alert(`Successfully added 1 stamp to customer ${customer.name || phone}!`);
+        alert(`Successfully added 1 stamp to customer ${result.name || 'Anonymous'} (${result.phone})!`);
         await loadCustomers();
       } catch (err) {
         alert(err.message);

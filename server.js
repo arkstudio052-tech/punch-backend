@@ -360,35 +360,23 @@ app.post('/api/customers/:customerId/add-point', requireOwnerAuth, checkShopSusp
   }
 });
 
-// Stamp Customer points via store PIN (Public Endpoint)
-app.post('/api/customers/:customerId/stamp-by-pin', checkShopSuspension, async (req, res) => {
-  const { pin } = req.body;
-  if (!pin) {
-    return res.status(400).json({ error: 'Store passcode/PIN is required.' });
+// Stamp Customer points via customer's 4-digit phone code (Owner Auth Required)
+app.post('/api/shops/:shopSlug/stamp-by-code', requireOwnerAuth, checkShopSuspension, async (req, res) => {
+  const { code } = req.body;
+  if (!code) {
+    return res.status(400).json({ error: 'Customer 4-digit code is required.' });
+  }
+
+  const cleanCode = String(code).trim();
+  if (cleanCode.length !== 4 || isNaN(cleanCode)) {
+    return res.status(400).json({ error: 'Please enter a valid 4-digit code.' });
   }
 
   try {
-    const customer = await db.getCustomer(req.params.customerId);
-    if (!customer) {
-      return res.status(404).json({ error: 'Customer not found.' });
-    }
-
-    const shop = await db.getShop(customer.shopId);
-    if (!shop) {
-      return res.status(404).json({ error: 'Shop not found.' });
-    }
-
-    const expectedPin = String(shop.ownerPassword || 'admin').trim();
-    const last4Expected = expectedPin.slice(-4);
-    
-    if (pin !== expectedPin && pin !== last4Expected) {
-      return res.status(401).json({ error: 'Invalid store passcode/PIN.' });
-    }
-
-    const updatedCustomer = await db.addCustomerPoint(customer.id);
-    res.json(updatedCustomer);
+    const customer = await db.stampCustomerByPhoneCode(req.params.shopSlug, cleanCode);
+    res.json(customer);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(400).json({ error: error.message });
   }
 });
 
